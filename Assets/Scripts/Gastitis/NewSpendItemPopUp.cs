@@ -88,3 +88,9 @@ public class NewSpendingResult
     public bool IsCancelled;
     public SpendingItem NewSpending;
 }
+
+public class NewCategoryResult
+{
+	public bool IsCancelled;
+	public string NewCategoryName;
+}

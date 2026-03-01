@@ -13,8 +13,12 @@ public class SpendsManager : MonoBehaviour
 	public ICurrentDateTimeProvider _dateTimeProvider;
 
 	public NewSpendItemPopUp NewSpendItemPopUp;
+	public NewCategoryBtnPopUp newCategoryPopUp;
+	public RemoveCategoriesPopUp RemoveCategoriesPopUp;
 	public SpendCategoryLibrary CategoryLibrary;
 	public Button AddSpendingButton;
+	public Button AddCategoryButton;
+	public Button RemoveCategoriesButton;
 	public SpendItemUI SpendingButtonUIProtitype;
 	public Transform SpendingsListContentParent;
 	public TMP_Dropdown MonthSelectorDropdown;
@@ -39,8 +43,6 @@ public class SpendsManager : MonoBehaviour
 		{
 			Destroy(gameObject);
 		}
-
-
 	}
 
     private void Start()
@@ -60,13 +62,32 @@ public class SpendsManager : MonoBehaviour
 			StartCoroutine(GetNewSpending());
 		});
 
-		MonthSelectorDropdown.onValueChanged.AddListener(ChangeCurrentMonthDataAndUI);
+		AddCategoryButton.onClick.AddListener(() =>
+		{
+			StartCoroutine(GetNewCategoryName());
+		});
+
+		RemoveCategoriesButton.onClick.AddListener(() =>
+		{
+			StartCoroutine(OpenCategoriesRemoval());
+		});
+
+
+		MonthSelectorDropdown.onValueChanged.AddListener(OnMonthDropdownChanged);
 
 
 		ChangeCurrentMonthData(_dateTimeProvider.Now.Month);
 		ChangeCurrentMonthUIBasedOnData();
 
 		NewSpendItemPopUp.gameObject.SetActive(false);
+	}
+
+
+	public void OnMonthDropdownChanged(int newMonthFromDropdown)
+	{
+		var newMonth = newMonthFromDropdown + 1;
+		ChangeCurrentMonthData(newMonth);
+		ChangeCurrentMonthUIBasedOnData();
 	}
 
 	public void ChangeCurrentMonthDataAndUI(int newMonth)
@@ -77,7 +98,7 @@ public class SpendsManager : MonoBehaviour
 
 	public void ChangeCurrentMonthData(int newMonth)
 	{
-		MonthSelectorDropdown.SetValueWithoutNotify(newMonth);
+		MonthSelectorDropdown.SetValueWithoutNotify(newMonth - 1);
 		currMonthShowing = newMonth;
 	}
 
@@ -115,6 +136,23 @@ public class SpendsManager : MonoBehaviour
 		AddSpendingItem(result.NewSpending);
 	}
 
+
+	private IEnumerator OpenCategoriesRemoval()
+	{
+		yield return RemoveCategoriesPopUp.Execute(CategoryLibrary);
+	}
+
+	private IEnumerator GetNewCategoryName()
+	{
+		NewCategoryResult result = new NewCategoryResult();
+		yield return newCategoryPopUp.GetNewCategoryInfo(result);
+		if (result.IsCancelled)
+		{
+			yield break;
+		}
+		AddCategory(result.NewCategoryName);
+	}
+
 	public void AddSpendingItem(SpendingItem item)
 	{
 		var currMonth = _dateTimeProvider.Now.Month - 1;
@@ -130,6 +168,24 @@ public class SpendsManager : MonoBehaviour
 		AddSpendingItemUI(item);
 
 		RefreshTotalSpendings();
+	}
+
+	public void AddCategory(string newName)
+	{
+		var allCats = CategoryLibrary.Categories;
+
+		foreach (var cat in allCats)
+		{
+			//Category already exist
+			if (cat.CategoryName == newName) return;
+		}
+
+		var newCat = new SpendCategory();
+		newCat.CategoryName = newName;
+
+
+		CategoryLibrary.Categories.Add(newCat);
+
 	}
 
 	void AddSpendingItemUI(SpendingItem item)
@@ -154,8 +210,7 @@ void RefreshTotalSpendings()
 	{
 		var item = itemUI.SpendingItemData;
 
-		var itemsMonth = item.DateTime.Month;
-		if(!SpendingItems.TryGetValue(itemsMonth, out var spendingsFound))
+		if(!SpendingItems.TryGetValue(currMonthShowing, out var spendingsFound))
 		{
 			Debug.LogError("No items found for the month of the item to remove");
 			return;
