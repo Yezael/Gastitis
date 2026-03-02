@@ -23,10 +23,12 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 		});
 
 		CategoryItems = new List<CategoryItemUI>();
+		CategoryItemPrototype.gameObject.SetActive(false);
 	}
 
 	public void OnWantsToRemoveCategory(CategoryItemUI toRemove)
 	{
+		SpendsManager.Instance.OnCategoryWasRemoved(toRemove.Data.CategoryID);
 		var idx = CategoryLibrary.Categories.FindIndex(x => x.CategoryID == toRemove.Data.CategoryID);
 		CategoryLibrary.Categories.RemoveAt(idx);
 		CategoryItems.Remove(toRemove);
@@ -62,7 +64,10 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 		for (int i = 0; i < datas.Count; i++)
 		{
 			AddCategoryUI(datas[i]);
+			CategoryItems[i].gameObject.SetActive(true);
+			CategoryItems[i].RemoveSpendingBtn.gameObject.SetActive(i != 0);
 		}
+
 	}
 
 	void AddCategoryUI(SpendCategory categoryData)

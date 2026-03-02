@@ -155,7 +155,7 @@ public class SpendsManager : MonoBehaviour
 
 	public void AddSpendingItem(SpendingItem item)
 	{
-		var currMonth = _dateTimeProvider.Now.Month - 1;
+		var currMonth = currMonthShowing;
 		if (SpendingItems.ContainsKey(currMonth))
 		{
 			SpendingItems[currMonth].Add(item);
@@ -198,10 +198,28 @@ public class SpendsManager : MonoBehaviour
 
 	}
 
-void RefreshTotalSpendings()
+	void RefreshTotalSpendings()
 	{
 		var totalSpending = GetTotalSpending(currMonthShowing);
-		TotalSpendText.text = totalSpending.ToString("C");
+		TotalSpendText.text = NewSpendItemPopUp.ToFormattedNumber(totalSpending);
+	}
+
+	public void OnCategoryWasRemoved(string categoryID)
+	{
+		var categoryIdx = CategoryLibrary.Categories.FindIndex(x => x.CategoryID == categoryID);
+
+		foreach(var itemLists in SpendingItems.Values)
+		{
+			for (var i = 0; i < itemLists.Count; i++)
+			{
+				var item = itemLists[i];
+				if (item.Category != categoryIdx) continue;
+
+				item.Category = 0;
+			}
+		}
+
+		RefreshVisibleElements();
 	}
 
 
@@ -227,7 +245,7 @@ void RefreshTotalSpendings()
 
 	public void ModifyExistentSpendingItem(SpendingItem item)
 	{
-		var itemsMonth = item.DateTime.Month;
+		var itemsMonth = currMonthShowing;
 		if (!SpendingItems.TryGetValue(itemsMonth, out var spendingsFound))
 		{
 			Debug.LogError("No items found for the month of the item to modify");

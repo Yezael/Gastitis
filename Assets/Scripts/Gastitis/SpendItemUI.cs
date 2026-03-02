@@ -24,7 +24,7 @@ public class SpendItemUI : MonoBehaviour
     {
         SpendingItemData = item;
         ItemDescriptionText.text = item.Description;
-        ItemAmountText.text = item.SpendAmount.ToString("C");
+        ItemAmountText.text = NewSpendItemPopUp.ToFormattedNumber(item.SpendAmount);
         ItemCategoryNameText.text = SpendsManager.Instance.CategoryLibrary.Categories[item.Category].CategoryName;
     }
 
