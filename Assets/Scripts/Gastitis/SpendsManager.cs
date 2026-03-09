@@ -5,6 +5,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using Newtonsoft.Json;
 using System;
+using System.Text;
+using System.IO;
+using NativeShareNamespace;
 
 public class SpendsManager : MonoBehaviour
 {
@@ -19,6 +22,7 @@ public class SpendsManager : MonoBehaviour
 	public Button AddSpendingButton;
 	public Button AddCategoryButton;
 	public Button RemoveCategoriesButton;
+	public Button ExportMonthSpendingsButton;
 	public SpendItemUI SpendingButtonUIProtitype;
 	public Transform SpendingsListContentParent;
 	public TMP_Dropdown MonthSelectorDropdown;
@@ -29,6 +33,9 @@ public class SpendsManager : MonoBehaviour
 	public List<SpendItemUI> spendItemUIs = new List<SpendItemUI>();
 
 	public int currMonthShowing = 0;
+
+	bool _isQuitting = false;
+
 
 	private void Awake()
 	{
@@ -56,10 +63,16 @@ public class SpendsManager : MonoBehaviour
 		Instance = this;
 		SpendingItems = GetDataFromLocalDisk();
 
+		var customCategories = GetCategoriesDatasFromLocalDisk();
+		if(customCategories != null)
+		{
+			CategoryLibrary.Categories = customCategories;
+		}
+
 
 		AddSpendingButton.onClick.AddListener(() =>
 		{
-			//StartCoroutine(GetNewSpending());
+			StartCoroutine(GetNewSpending());
 		});
 
 		AddCategoryButton.onClick.AddListener(() =>
@@ -73,6 +86,7 @@ public class SpendsManager : MonoBehaviour
 		});
 
 
+		ExportMonthSpendingsButton.onClick.AddListener(ExportCurrentMonthSpendings);
 		MonthSelectorDropdown.onValueChanged.AddListener(OnMonthDropdownChanged);
 
 
@@ -297,8 +311,11 @@ public class SpendsManager : MonoBehaviour
 	{
 		var dataToSerialize = new SerializableData(SpendingItems);
 		var json = JsonConvert.SerializeObject(dataToSerialize);
-
 		PlayerPrefs.SetString("DATA", json);
+
+		var categoriesJson = JsonConvert.SerializeObject(CategoryLibrary.Categories);
+		PlayerPrefs.SetString("CATEGORIESDATAS", categoriesJson);
+
 		PlayerPrefs.Save();
 	}
 
@@ -314,10 +331,80 @@ public class SpendsManager : MonoBehaviour
 		return data.SpendingItems;
 	}
 
-    private void OnApplicationQuit()
-    {
+	public List<SpendCategory> GetCategoriesDatasFromLocalDisk()
+	{
+		var stringData = PlayerPrefs.GetString("CATEGORIESDATAS");
+		if (string.IsNullOrEmpty(stringData))
+		{
+			return null; 
+		}
+
+		var data = JsonConvert.DeserializeObject<List<SpendCategory>>(stringData);
+		return data;
+	}
+
+
+	void OnApplicationPause(bool pause)
+	{
+		if (pause && !_isQuitting)
+			SaveData();
+	}
+
+	void OnApplicationFocus(bool focus)
+	{
+		if (!focus && !_isQuitting)
+			SaveData();
+	}
+
+	void OnApplicationQuit()
+	{
+		_isQuitting = true;
 		SaveData();
-    }
+	}
+
+	public void ExportCurrentMonthSpendings()
+	{
+		var monthName = MonthSelectorDropdown.options[currMonthShowing - 1].text;
+		var monthData = SpendingItems[currMonthShowing];
+		ExportToCSV(monthData, monthName);
+	}
+
+	public void ExportToCSV(List<SpendingItem> spendings, string month)
+	{
+		StringBuilder csv = new StringBuilder();
+
+		// Header
+		csv.AppendLine("Amount,Category,Description,Day");
+
+		foreach (var s in spendings)
+		{
+			var currCategoryName = CategoryLibrary.Categories[s.Category].CategoryName;
+			csv.AppendLine($"{s.SpendAmount},{currCategoryName},{Escape(s.Description)},{s.DateTime.Day}");
+		}
+
+		string path = Path.Combine(Application.persistentDataPath, "spendings" + month + ".csv");
+
+		File.WriteAllText(path, csv.ToString());
+
+		Debug.Log("CSV exported to: " + path);
+
+#if PLATFORM_ANDROID
+		var nativeShare = new NativeShare();
+		nativeShare.AddFile(path);
+
+		nativeShare.Share();
+#endif
+	}
+
+	string Escape(string value)
+	{
+		if (value.Contains(",") || value.Contains("\"") || value.Contains("\n"))
+		{
+			value = value.Replace("\"", "\"\"");
+			return $"\"{value}\"";
+		}
+		return value;
+	}
 }
 
 [Serializable]

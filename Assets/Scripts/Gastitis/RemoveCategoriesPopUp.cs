@@ -60,6 +60,7 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 
 		CategoryItems.Clear();
 
+
 		var datas = CategoryLibrary.Categories;
 		for (int i = 0; i < datas.Count; i++)
 		{
