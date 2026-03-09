@@ -72,7 +72,7 @@ public class SpendsManager : MonoBehaviour
 
 		AddSpendingButton.onClick.AddListener(() =>
 		{
-			//StartCoroutine(GetNewSpending());
+			StartCoroutine(GetNewSpending());
 		});
 
 		AddCategoryButton.onClick.AddListener(() =>
