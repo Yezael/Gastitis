@@ -1,0 +1,18 @@
+name: Build
+on: pull_request
+jobs:
+  BuildForAllSupportedPlatforms:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        targetPlaform:
+          - StandaloneOSX
+          - StandaloneWindows
+          - StandaloneWindows64
+          - StandaloneLinux64
+          - iOS
+          - Android
+          - WebGl
+      steps:
+        uses: actions/checkout@v4
