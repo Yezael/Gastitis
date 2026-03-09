@@ -6,9 +6,8 @@ set PROJECT_PATH=%cd%
 "%UNITY_PATH%" ^
 -projectPath "%PROJECT_PATH%" ^
 -runTests ^
--testPlatform playmode ^
+-testPlatform PlayMode ^
 -testResults "%PROJECT_PATH%\playmode-results.xml" ^
--logFile "%PROJECT_PATH%\unity-test.log" ^
 -quit
 
 echo Exit Code: %ERRORLEVEL%

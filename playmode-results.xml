@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="3" result="Passed" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0" engine-version="3.5.0.0" clr-version="4.0.30319.42000" start-time="2026-03-09 17:04:20Z" end-time="2026-03-09 17:04:20Z" duration="0,0203898">
+  <test-suite type="TestSuite" id="1000" name="Gastitis" fullname="Gastitis" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-03-09 17:04:20Z" end-time="2026-03-09 17:04:20Z" duration="0.020390" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+    <properties />
+    <test-suite type="Assembly" id="1006" name="PlayModeTests.dll" fullname="C:/Users/USER/Documents/Work/OwnApps/Gastitis/Gastitis_App/Library/ScriptAssemblies/PlayModeTests.dll" runstate="Runnable" testcasecount="3" result="Passed" start-time="2026-03-09 17:04:20Z" end-time="2026-03-09 17:04:20Z" duration="0.016587" total="3" passed="3" failed="0" inconclusive="0" skipped="0" asserts="0">
+      <properties>
+        <property name="_PID" value="10952" />
+        <property name="_APPDOMAIN" value="Unity Child Domain" />
+        <property name="platform" value="PlayMode" />
+      </properties>
+      <test-suite type="TestFixture" id="1001" name="SimpleTest" fullname="SimpleTest" classname="SimpleTest" runstate="Runnable" testcasecount="2" result="Passed" start-time="2026-03-09 17:04:20Z" end-time="2026-03-09 17:04:20Z" duration="0.013643" total="2" passed="2" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1002" name="SimpleTestSimplePasses" fullname="SimpleTest.SimpleTestSimplePasses" methodname="SimpleTestSimplePasses" classname="SimpleTest" runstate="Runnable" seed="1285402108" result="Passed" start-time="2026-03-09 17:04:20Z" end-time="2026-03-09 17:04:20Z" duration="0.003621" asserts="0">
+          <properties />
+        </test-case>
+        <test-case id="1003" name="SimpleTestWithEnumeratorPasses" fullname="SimpleTest.SimpleTestWithEnumeratorPasses" methodname="SimpleTestWithEnumeratorPasses" classname="SimpleTest" runstate="Runnable" seed="2131112852" result="Passed" start-time="2026-03-09 17:04:20Z" end-time="2026-03-09 17:04:20Z" duration="0.002764" asserts="0">
+          <properties>
+            <property name="_JOINTYPE" value="UnityCombinatorial" />
+          </properties>
+        </test-case>
+      </test-suite>
+      <test-suite type="TestFixture" id="1004" name="Test_ClickOnCreateNewSpendingItem" fullname="Test_ClickOnCreateNewSpendingItem" classname="Test_ClickOnCreateNewSpendingItem" runstate="Runnable" testcasecount="1" result="Passed" start-time="2026-03-09 17:04:20Z" end-time="2026-03-09 17:04:20Z" duration="0.001934" total="1" passed="1" failed="0" inconclusive="0" skipped="0" asserts="0">
+        <properties />
+        <test-case id="1005" name="Test_ClickOnCreateNewSpendingItemWithEnumeratorPasses" fullname="Test_ClickOnCreateNewSpendingItem.Test_ClickOnCreateNewSpendingItemWithEnumeratorPasses" methodname="Test_ClickOnCreateNewSpendingItemWithEnumeratorPasses" classname="Test_ClickOnCreateNewSpendingItem" runstate="Runnable" seed="1086624164" result="Passed" start-time="2026-03-09 17:04:20Z" end-time="2026-03-09 17:04:20Z" duration="0.001262" asserts="0">
+          <properties>
+            <property name="_JOINTYPE" value="UnityCombinatorial" />
+          </properties>
+        </test-case>
+      </test-suite>
+    </test-suite>
+  </test-suite>
+</test-run>

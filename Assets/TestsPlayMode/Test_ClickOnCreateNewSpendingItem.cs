@@ -13,8 +13,6 @@ public class Test_ClickOnCreateNewSpendingItem
     [UnityTest]
     public IEnumerator Test_ClickOnCreateNewSpendingItemWithEnumeratorPasses()
     {
-        yield break;
-
         yield return SceneManager.LoadSceneAsync("SampleScene");
         yield return null;
 
@@ -32,6 +30,6 @@ public class Test_ClickOnCreateNewSpendingItem
     [TearDown]
     public void TearDown()
     {
-        //SceneManager.UnloadSceneAsync("SampleScene");
+        SceneManager.UnloadSceneAsync("SampleScene");
     }
 }
