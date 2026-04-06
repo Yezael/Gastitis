@@ -12,6 +12,7 @@ using NativeShareNamespace;
 public class SpendsManager : MonoBehaviour
 {
 	public static SpendsManager Instance;
+	public MigrationsManager MigrationManager = new();
 
 	public ICurrentDateTimeProvider _dateTimeProvider;
 
@@ -26,23 +27,26 @@ public class SpendsManager : MonoBehaviour
 	public SpendItemUI SpendingButtonUIProtitype;
 	public Transform SpendingsListContentParent;
 	public TMP_Dropdown MonthSelectorDropdown;
+	public TMP_Dropdown CategorySelectorDropdown;
+
+	public string currentCategorySelected = null;
 
 	public TMP_Text TotalSpendText;
 
-	public Dictionary<int, List<SpendingItem>> SpendingItems;
+	public Dictionary<int, List<SpendingItem>> SpendingItems = new();
 	public List<SpendItemUI> spendItemUIs = new List<SpendItemUI>();
 
 	public int currMonthShowing = 0;
+	public string currCategoryFilter = string.Empty;
 
 	bool _isQuitting = false;
 
 
 	private void Awake()
 	{
-		if(Instance == null)
+        if (Instance == null)
 		{
 			Instance = this;
-			SpendingItems = new Dictionary<int, List<SpendingItem>>();
 			return;
 		}
 
@@ -69,8 +73,10 @@ public class SpendsManager : MonoBehaviour
 			CategoryLibrary.Categories = customCategories;
 		}
 
+        MigrationManager.MigrateDataIfNeeded(SpendingItems);
 
-		AddSpendingButton.onClick.AddListener(() =>
+
+        AddSpendingButton.onClick.AddListener(() =>
 		{
 			StartCoroutine(GetNewSpending());
 		});
@@ -85,13 +91,29 @@ public class SpendsManager : MonoBehaviour
 			StartCoroutine(OpenCategoriesRemoval());
 		});
 
+		CategorySelectorDropdown.options.Clear();
+
+		List<TMP_Dropdown.OptionData> options = new();
+		var defaultOpt = new TMP_Dropdown.OptionData("NONE");
+		options.Add(defaultOpt);
+
+        for (int i = 0; i < CategoryLibrary.Categories.Count; i++)
+		{
+			var newOpt = new TMP_Dropdown.OptionData(CategoryLibrary.Categories[i].CategoryName);
+			options.Add(newOpt);
+		}
+
+		CategorySelectorDropdown.AddOptions(options);
+		CategorySelectorDropdown.SetValueWithoutNotify(0);
+
 
 		ExportMonthSpendingsButton.onClick.AddListener(ExportCurrentMonthSpendings);
 		MonthSelectorDropdown.onValueChanged.AddListener(OnMonthDropdownChanged);
+		CategorySelectorDropdown.onValueChanged.AddListener(OnCategoryDropdownChanged);
 
 
 		ChangeCurrentMonthData(_dateTimeProvider.Now.Month);
-		ChangeCurrentMonthUIBasedOnData();
+		RefreshUIBaseOnCurrentData();
 
 		NewSpendItemPopUp.gameObject.SetActive(false);
 	}
@@ -101,22 +123,39 @@ public class SpendsManager : MonoBehaviour
 	{
 		var newMonth = newMonthFromDropdown + 1;
 		ChangeCurrentMonthData(newMonth);
-		ChangeCurrentMonthUIBasedOnData();
+		RefreshUIBaseOnCurrentData();
 	}
 
-	public void ChangeCurrentMonthDataAndUI(int newMonth)
+    public void ChangeCurrentMonthDataAndUI(int newMonth)
+    {
+        ChangeCurrentMonthData(newMonth);
+        RefreshUIBaseOnCurrentData();
+    }
+
+    public void ChangeCurrentMonthData(int newMonth)
+    {
+        MonthSelectorDropdown.SetValueWithoutNotify(newMonth - 1);
+        currMonthShowing = newMonth;
+    }
+
+    public void OnCategoryDropdownChanged(int newCategory)
 	{
-		ChangeCurrentMonthData(newMonth);
-		ChangeCurrentMonthUIBasedOnData();
-	}
+		//To take into account the "none" filter that is the 0 index of the dropdown
+		newCategory--;
+		if (newCategory < 0)
+		{
+			currCategoryFilter = string.Empty;
+		}
+		else
+		{
+            currCategoryFilter = CategoryLibrary.Categories[newCategory].CategoryID;
+        }
 
-	public void ChangeCurrentMonthData(int newMonth)
-	{
-		MonthSelectorDropdown.SetValueWithoutNotify(newMonth - 1);
-		currMonthShowing = newMonth;
-	}
+		RefreshUIBaseOnCurrentData();
+    }
 
-	public void ChangeCurrentMonthUIBasedOnData()
+
+    public void RefreshUIBaseOnCurrentData()
 	{
 		RefreshTotalSpendings();
 		RefreshVisibleElements();
@@ -135,8 +174,16 @@ public class SpendsManager : MonoBehaviour
 
 		for(int i = 0;i < newData.Count; i++)
 		{
+			if (string.IsNullOrEmpty(currCategoryFilter))
+			{
+                AddSpendingItemUI(newData[i]);
+				continue;
+            }
+
+			if (newData[i].CategoryID != currCategoryFilter) continue;
+
 			AddSpendingItemUI(newData[i]);
-		}
+        }
 	}
 
 	private IEnumerator GetNewSpending()
@@ -214,26 +261,26 @@ public class SpendsManager : MonoBehaviour
 
 	void RefreshTotalSpendings()
 	{
-		var totalSpending = GetTotalSpending(currMonthShowing);
+		var totalSpending = GetTotalSpending(currMonthShowing, currCategoryFilter);
 		TotalSpendText.text = NewSpendItemPopUp.ToFormattedNumber(totalSpending);
 	}
 
 	public void OnCategoryWasRemoved(string categoryID)
 	{
-		var categoryIdx = CategoryLibrary.Categories.FindIndex(x => x.CategoryID == categoryID);
+		var defaultID = CategoryLibrary.Categories[0].CategoryID;
 
 		foreach(var itemLists in SpendingItems.Values)
 		{
 			for (var i = 0; i < itemLists.Count; i++)
 			{
 				var item = itemLists[i];
-				if (item.Category != categoryIdx) continue;
+				if (item.CategoryID != categoryID) continue;
 
-				item.Category = 0;
+				item.CategoryID = defaultID;
 			}
 		}
 
-		RefreshVisibleElements();
+        RefreshVisibleElements();
 	}
 
 
@@ -278,7 +325,7 @@ public class SpendsManager : MonoBehaviour
 		RefreshTotalSpendings();
 	}
 
-	public float GetTotalSpending(int month, SpendCategory category = null)
+	public float GetTotalSpending(int month, string categoryID)
 	{
 		float total = 0;
 
@@ -289,20 +336,17 @@ public class SpendsManager : MonoBehaviour
 
 		var spendingsFound = SpendingItems[month];
 
-		var categoryIndex = CategoryLibrary.Categories.IndexOf(category);
-
 		foreach (var item in spendingsFound)
 		{
-			if (category == null)
+			if (string.IsNullOrEmpty(categoryID))
 			{
 				total += item.SpendAmount;
 				continue;
 			}
 
-			if (item.Category == categoryIndex)
-			{
-				total += item.SpendAmount;
-			}
+			if (item.CategoryID != categoryID) continue;
+
+			total += item.SpendAmount;
 		}
 		return total;
 	}
@@ -378,7 +422,7 @@ public class SpendsManager : MonoBehaviour
 
 		foreach (var s in spendings)
 		{
-			var currCategoryName = CategoryLibrary.Categories[s.Category].CategoryName;
+			var currCategoryName = CategoryLibrary.GetCategoryByID(s.CategoryID).CategoryName;
 			csv.AppendLine($"{s.SpendAmount},{currCategoryName},{Escape(s.Description)},{s.DateTime.Day}");
 		}
 

@@ -127,12 +127,16 @@ public class NewSpendItemPopUp : MonoBehaviour
 
             var newValue = ToPlainNumber(AmountInput.text);
 
+            var categoryIdxSelected = CategorySelector.value;
+            var categoryPicked = SpendsManager.Instance.CategoryLibrary.Categories[categoryIdxSelected];
+
             var newSpending = new SpendingItem()
             {
                 Description = DescriptionInput.text,
                 SpendAmount = float.Parse(newValue.ToString()),
-                Category = CategorySelector.value,
-                DateTime = System.DateTime.Now
+                CategoryID = categoryPicked.CategoryID,
+                DateTime = System.DateTime.Now,
+                DataVersion = SpendingItem.LatestDataVersion
             };
             result.IsCancelled = false;
             result.NewSpending = newSpending;

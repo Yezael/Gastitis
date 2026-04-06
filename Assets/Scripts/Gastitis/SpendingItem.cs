@@ -1,13 +1,15 @@
+using JetBrains.Annotations;
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
 
 [Serializable]
 public class SpendingItem
 {
+    public static int LatestDataVersion = 1;
+    public int DataVersion = 0;
+
     public float SpendAmount;
     public string Description;
-    public int Category;
+
+    public string CategoryID;
     public DateTime DateTime;
 }
