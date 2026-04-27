@@ -25,22 +25,22 @@ public class NewSpendItemPopUp : MonoBehaviour
     {
         confirmed = false;
         cancelled = false;
-        ConfirmButton.onClick.AddListener(() =>
-        {
-            confirmed = true;
-        });
-
-        CancelButton.onClick.AddListener(() =>
-        {
-            cancelled = true;
-        });
-
-       
+        ConfirmButton.onClick.AddListener(OnConfirmClicked);
+        CancelButton.onClick.AddListener(OnCancelClicked);
 
         AmountInput.onEndEdit.AddListener(FormatInput);
 
         StartEdittingAmountBtn.onClick.AddListener(OnStartEditingNumber);
+    }
 
+    private void OnConfirmClicked()
+    {
+        confirmed = true;
+    }
+
+    private void OnCancelClicked()
+    {
+        cancelled = true;
     }
 
     private void OnStartEditingNumber()
@@ -53,65 +53,91 @@ public class NewSpendItemPopUp : MonoBehaviour
         AmountInput.SetTextWithoutNotify(number.ToString());
     }
 
-	private void FormatInput(string value)
-	{
-		AmountDisplayer.gameObject.SetActive(true);
+    private void FormatInput(string value)
+    {
+        AmountDisplayer.gameObject.SetActive(true);
 
         // Extract digits only
         float number = ToPlainNumber(value);
 
-		if (number == -1)
-		{
-			AmountDisplayer.text = "";
-			return;
-		}
+        if (number == -1)
+        {
+            AmountDisplayer.text = "";
+            return;
+        }
 
         string formatted = ToFormattedNumber((float)number);
-		AmountInput.text = formatted;
-
+        AmountInput.text = formatted;
 
         StartEdittingAmountBtn.gameObject.SetActive(true);
         AmountDisplayer.text = formatted;
-	}
+    }
 
     public static float ToPlainNumber(string text)
     {
-		string digitsOnly = Regex.Replace(text, @"[^\d]", "");
-		if (!decimal.TryParse(digitsOnly, out decimal number)) return 0;
+        string digitsOnly = Regex.Replace(text, @"[^\d]", "");
+        if (!decimal.TryParse(digitsOnly, out decimal number)) return 0;
 
-		if (string.IsNullOrEmpty(digitsOnly))
-		{
+        if (string.IsNullOrEmpty(digitsOnly))
+        {
             return -1;
-		}
+        }
 
-		return (float) number;
+        return (float) number;
     }
 
     public static string ToFormattedNumber(float number)
     {
         return number.ToString("#,0", CultureInfo.InvariantCulture) + "$";
-	}
+    }
 
-	public IEnumerator GetNewSpending(NewSpendingResult result)
+    public IEnumerator GetNewSpending(NewSpendingResult result)
     {
-		gameObject.SetActive(true);
+        yield return ModifyOrCreateSpending(null, result);
+    }
+
+    public IEnumerator ModifyOrCreateSpending(SpendingItem existing, NewSpendingResult result)
+    {
+        gameObject.SetActive(true);
 
         CategorySelector.ClearOptions();
 
-		List<TMP_Dropdown.OptionData> options = new List<TMP_Dropdown.OptionData>();
-		for (int i = 0; i < CategoryLibrary.Categories.Count; i++)
-		{
-			options.Add(new TMP_Dropdown.OptionData(CategoryLibrary.Categories[i].CategoryName));
-		}
-		CategorySelector.AddOptions(options);
+        List<TMP_Dropdown.OptionData> options = new List<TMP_Dropdown.OptionData>();
+        for (int i = 0; i < CategoryLibrary.Categories.Count; i++)
+        {
+            options.Add(new TMP_Dropdown.OptionData(CategoryLibrary.Categories[i].CategoryName));
+        }
+        CategorySelector.AddOptions(options);
 
+        if (existing == null)
+        {
+            DescriptionInput.text = "";
+            AmountInput.text = "";
+            CategorySelector.value = 0;
+            AmountDisplayer.SetText("0$");
+        }
+        else
+        {
+            // Prefill fields with existing data
+            DescriptionInput.text = existing.Description;
+            AmountInput.text = ToFormattedNumber(existing.SpendAmount);
+            AmountDisplayer.SetText(ToFormattedNumber(existing.SpendAmount));
 
-        DescriptionInput.text = "";
-        AmountInput.text = "";
-        CategorySelector.value = 0;
-        AmountDisplayer.SetText("0$");
+            // Select category index that matches existing.CategoryID
+            int selectedIdx = 0;
+            for (int i = 0; i < CategoryLibrary.Categories.Count; i++)
+            {
+                if (CategoryLibrary.Categories[i].CategoryID == existing.CategoryID)
+                {
+                    selectedIdx = i;
+                    break;
+                }
+            }
 
-		while (!confirmed && !cancelled)
+            CategorySelector.value = selectedIdx;
+        }
+
+        while (!confirmed && !cancelled)
         {
             var isReady = !string.IsNullOrEmpty(DescriptionInput.text);
             isReady &= !string.IsNullOrEmpty(AmountInput.text);
@@ -124,7 +150,6 @@ public class NewSpendItemPopUp : MonoBehaviour
 
         if (confirmed)
         {
-
             var newValue = ToPlainNumber(AmountInput.text);
 
             var categoryIdxSelected = CategorySelector.value;
@@ -135,7 +160,7 @@ public class NewSpendItemPopUp : MonoBehaviour
                 Description = DescriptionInput.text,
                 SpendAmount = float.Parse(newValue.ToString()),
                 CategoryID = categoryPicked.CategoryID,
-                DateTime = System.DateTime.Now,
+                DateTime = existing == null ? System.DateTime.Now : existing.DateTime,
                 DataVersion = SpendingItem.LatestDataVersion
             };
             result.IsCancelled = false;
@@ -150,7 +175,7 @@ public class NewSpendItemPopUp : MonoBehaviour
         confirmed = false;
         cancelled = false;
 
-		gameObject.SetActive(false);
+        gameObject.SetActive(false);
     }
 }
 
@@ -163,6 +188,6 @@ public class NewSpendingResult
 
 public class NewCategoryResult
 {
-	public bool IsCancelled;
-	public string NewCategoryName;
+    public bool IsCancelled;
+    public string NewCategoryName;
 }

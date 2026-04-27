@@ -16,15 +16,14 @@ public class Test_ClickOnCreateNewSpendingItem
         yield return SceneManager.LoadSceneAsync("SampleScene");
         yield return null;
 
-        var spendManager = SpendsManager.Instance;
+        var uiManager = SpendsManager.Instance.UIManager;
 
-        Assert.IsNotNull(spendManager);
+        Assert.IsNotNull(uiManager);
 
-        spendManager.AddSpendingButton.onClick.Invoke();
-
+        uiManager.AddSpendingButton.onClick.Invoke();
         yield return null;
 
-        Assert.IsTrue(spendManager.NewSpendItemPopUp.gameObject.activeSelf);
+        Assert.IsTrue(uiManager.NewSpendItemPopUp.gameObject.activeSelf);
 	}
 
     [TearDown]

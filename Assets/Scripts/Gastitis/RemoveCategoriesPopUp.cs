@@ -28,7 +28,6 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 
 	public void OnWantsToRemoveCategory(CategoryItemUI toRemove)
 	{
-		SpendsManager.Instance.OnCategoryWasRemoved(toRemove.Data.CategoryID);
 		var idx = CategoryLibrary.Categories.FindIndex(x => x.CategoryID == toRemove.Data.CategoryID);
 		CategoryLibrary.Categories.RemoveAt(idx);
 		CategoryItems.Remove(toRemove);

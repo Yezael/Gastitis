@@ -11,16 +11,20 @@ public class SpendItemUI : MonoBehaviour
     public TMP_Text ItemDescriptionText;
     public TMP_Text ItemAmountText;
     public TMP_Text ItemCategoryNameText;
+    public TMP_Text ItemDateText;
     public Button RemoveSpendingBtn;
+    public Button EditSpendingBtn;
 
     public Action<SpendItemUI> OnWantsToRemoveSpending;
+    public Action<SpendItemUI> OnWantsToEditSpending;
 
     private void Awake()
     {
         RemoveSpendingBtn.onClick.AddListener(WantsToRemoveSpending);
-	}
+        EditSpendingBtn.onClick.AddListener(WantsToEditSpending);
+    }
 
-	public void SetData(SpendingItem item)
+    public void SetData(SpendingItem item)
     {
         SpendingItemData = item;
         ItemDescriptionText.text = item.Description;
@@ -28,10 +32,16 @@ public class SpendItemUI : MonoBehaviour
 
         var catgoryName = SpendsManager.Instance.CategoryLibrary.GetCategoryByID(item.CategoryID).CategoryName;
         ItemCategoryNameText.text = catgoryName;
+        ItemDateText.text = item.DateTime.ToString("dd/MM/yyyy");
     }
 
     private void WantsToRemoveSpending()
     {
         OnWantsToRemoveSpending?.Invoke(this);
-	}
+    }
+
+    private void WantsToEditSpending()
+    {
+        OnWantsToEditSpending?.Invoke(this);
+    }
 }
