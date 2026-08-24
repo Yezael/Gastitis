@@ -20,8 +20,8 @@ public class CsvExportService : IExportService
         foreach (var s in spendings)
         {
             var category = _categories.GetCategoryByID(s.CategoryID);
-            var name = category.CategoryName;
-            csv.AppendLine(string.Format("{0},{1},{2},{3}", s.SpendAmount, name, Escape(s.Description), s.DateTime.Day));
+            var name = category.Name;
+            csv.AppendLine(string.Format("{0},{1},{2},{3}", s.SpendAmount, name, Escape(s.Description), s.UTCDateTime.Day));
         }
 
         var path = Path.Combine(Application.persistentDataPath, "spendings" + monthName + ".csv");

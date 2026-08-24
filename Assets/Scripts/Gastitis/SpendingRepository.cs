@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public class SpendingRepository
@@ -36,21 +37,13 @@ public class SpendingRepository
 
         return list.Remove(item);
     }
-
-    public bool Modify(SpendingItem item, int month)
+    public bool RemoveById(int itemId, int month)
     {
-        if (!All.TryGetValue(month, out var list))
-        {
-            return false;
-        }
+        if (!All.TryGetValue(month, out var list)) return false;
+        var found = list.FindIndex(x => x.Id == itemId);
+        if (found == -1) return false;
 
-        var index = list.FindIndex(x => x.DateTime == item.DateTime);
-        if (index == -1)
-        {
-            return false;
-        }
-
-        list[index] = item;
+        list.RemoveAt(found);
         return true;
     }
 
@@ -64,9 +57,9 @@ public class SpendingRepository
         return list;
     }
 
-    public float GetTotal(int month, string categoryId)
+    public decimal GetTotal(int month, int categoryId)
     {
-        float total = 0f;
+        decimal total = 0;
         if (!All.TryGetValue(month, out var list))
         {
             return total;
@@ -74,7 +67,7 @@ public class SpendingRepository
 
         foreach (var item in list)
         {
-            if (string.IsNullOrEmpty(categoryId))
+            if (categoryId == -1)
             {
                 total += item.SpendAmount;
                 continue;

@@ -30,9 +30,9 @@ public class SpendItemUI : MonoBehaviour
         ItemDescriptionText.text = item.Description;
         ItemAmountText.text = NewSpendItemPopUp.ToFormattedNumber(item.SpendAmount);
 
-        var catgoryName = SpendsManager.Instance.CategoryLibrary.GetCategoryByID(item.CategoryID).CategoryName;
+        var catgoryName = SpendsManager.Instance.CategoryLibrary.GetCategoryByID(item.CategoryID).Name;
         ItemCategoryNameText.text = catgoryName;
-        ItemDateText.text = item.DateTime.ToString("dd/MM/yyyy");
+        ItemDateText.text = item.UTCDateTime.ToString("dd/MM/yyyy");
     }
 
     private void WantsToRemoveSpending()

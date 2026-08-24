@@ -73,7 +73,7 @@ public class UIManager : MonoBehaviour
 
         for (int i = 0; i < CategoryLibrary.Categories.Count; i++)
         {
-            var newOpt = new TMP_Dropdown.OptionData(CategoryLibrary.Categories[i].CategoryName);
+            var newOpt = new TMP_Dropdown.OptionData(CategoryLibrary.Categories[i].Name);
             options.Add(newOpt);
         }
 
@@ -102,11 +102,17 @@ public class UIManager : MonoBehaviour
         yield return NewSpendItemPopUp.GetNewSpending(result);
         if (result.IsCancelled) yield break;
 
-        _spendsManager.AddSpendingItem(result.NewSpending);
+        var task = _spendsManager.AddSpendingItem(result.NewSpending);
+        while (!task.IsCompleted)
+        {
+            yield return null;
+        }
     }
 
     IEnumerator EditSpendingFlow(SpendItemUI itemUI)
     {
+        var previousValue = itemUI.SpendingItemData.SpendAmount;
+
         NewSpendingResult result = new NewSpendingResult();
         yield return NewSpendItemPopUp.ModifyOrCreateSpending(itemUI.SpendingItemData, result);
         if (result.IsCancelled)
@@ -114,12 +120,27 @@ public class UIManager : MonoBehaviour
             yield break;
         }
 
-        _spendsManager.ModifyExistentSpendingItem(result.NewSpending);
+        var task = _spendsManager.ModifyExistentSpendingItem(result.NewSpending);
+
+        while(!task.IsCompleted)
+        {
+            yield return null;
+        }
+
+        if(task.IsCanceled || task.IsFaulted)
+        {
+            yield break;
+        }
 
         // Update UI item to reflect new data
-        itemUI.SetData(result.NewSpending);
+        itemUI.SetData(task.Result);
 
-        RefreshTotalSpendings();
+        var newValue = itemUI.SpendingItemData.SpendAmount;
+
+        if(newValue != previousValue)
+        {
+            RefreshTotalSpendings();
+        }
     }
 
     IEnumerator OpenCategoriesRemoval()
@@ -136,7 +157,11 @@ public class UIManager : MonoBehaviour
         yield return newCategoryPopUp.GetNewCategoryInfo(result);
         if (result.IsCancelled) yield break;
 
-        _spendsManager.AddCategory(result.NewCategoryName, CategoryLibrary.Categories);
+        var task = _spendsManager.AddCategory(result.NewCategoryName);
+        while (!task.IsCompleted)
+        {
+            yield return null;
+        }
         BuildCategoryDropdownOptions();
     }
 
@@ -145,7 +170,7 @@ public class UIManager : MonoBehaviour
         // If categories changed, ensure items with removed categories map to default.
         if (CategoryLibrary.Categories.Count == 0) return;
 
-        var defaultID = CategoryLibrary.Categories[0].CategoryID;
+        var defaultID = CategoryLibrary.Categories[0].Id;
         foreach (var itemLists in _spendsManager.SpendingItems.All.Values)
         {
             for (var i = 0; i < itemLists.Count; i++)
@@ -154,7 +179,7 @@ public class UIManager : MonoBehaviour
                 bool found = false;
                 for (var c = 0; c < CategoryLibrary.Categories.Count; c++)
                 {
-                    if (CategoryLibrary.Categories[c].CategoryID == item.CategoryID)
+                    if (CategoryLibrary.Categories[c].Id == item.CategoryID)
                     {
                         found = true;
                         break;
@@ -183,11 +208,11 @@ public class UIManager : MonoBehaviour
         newCategory--;
         if (newCategory < 0)
         {
-            _spendsManager.currCategoryFilter = string.Empty;
+            _spendsManager.currCategoryIDSelected = -1;
         }
         else
         {
-            _spendsManager.currCategoryFilter = CategoryLibrary.Categories[newCategory].CategoryID;
+            _spendsManager.currCategoryIDSelected = CategoryLibrary.Categories[newCategory].Id;
         }
 
         RefreshUIBaseOnCurrentData();
@@ -224,7 +249,7 @@ public class UIManager : MonoBehaviour
             var item = newData[i];
 
             // Category filter
-            if (!string.IsNullOrEmpty(_spendsManager.currCategoryFilter) && item.CategoryID != _spendsManager.currCategoryFilter)
+            if (_spendsManager.currCategoryIDSelected != -1 && item.CategoryID != _spendsManager.currCategoryIDSelected)
             {
                 continue;
             }
@@ -255,9 +280,19 @@ public class UIManager : MonoBehaviour
 
     void OnSpendingUIRequestsRemove(SpendItemUI itemUI)
     {
+        StartCoroutine(RemoveSpendingItem(itemUI));
+    }
+
+    IEnumerator RemoveSpendingItem(SpendItemUI itemUI)
+    {
         var item = itemUI.SpendingItemData;
-        var removed = _spendsManager.RemoveSpendingItem(item);
-        if (!removed) return;
+        var task = _spendsManager.RemoveSpendingItem(item);
+        while (!task.IsCompleted)
+        {
+            yield return null;
+        }
+
+        if (!task.Result == false) yield break;
 
         spendItemUIs.Remove(itemUI);
         itemUI.OnWantsToRemoveSpending -= OnSpendingUIRequestsRemove;
@@ -274,7 +309,7 @@ public class UIManager : MonoBehaviour
 
     void RefreshTotalSpendings()
     {
-        float total = 0f;
+        decimal total = 0;
         var monthData = _spendsManager.SpendingItems.GetByMonth(_spendsManager.currMonthShowing);
 
         for (int i = 0; i < monthData.Count; i++)
@@ -282,8 +317,8 @@ public class UIManager : MonoBehaviour
             var item = monthData[i];
 
             // Apply category filter
-            if (!string.IsNullOrEmpty(_spendsManager.currCategoryFilter) 
-                && item.CategoryID != _spendsManager.currCategoryFilter) continue;
+            if (_spendsManager.currCategoryIDSelected != -1
+                && item.CategoryID != _spendsManager.currCategoryIDSelected) continue;
 
             // Apply search filter
             if (!string.IsNullOrEmpty(_currSearchFilter))

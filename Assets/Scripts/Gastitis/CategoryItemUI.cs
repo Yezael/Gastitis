@@ -19,7 +19,7 @@ public class CategoryItemUI : MonoBehaviour
 	public void SetData(SpendCategory item)
     {
         Data = item;
-        CategoryName.text = item.CategoryName;
+        CategoryName.text = item.Name;
     }
 
     private void WantsToRemoveCategory()

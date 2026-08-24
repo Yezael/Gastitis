@@ -1,15 +1,24 @@
-using JetBrains.Annotations;
 using System;
 
 [Serializable]
 public class SpendingItem
 {
-    public static int LatestDataVersion = 1;
-    public int DataVersion = 0;
+    public int Id;
 
-    public float SpendAmount;
+    public decimal SpendAmount;
     public string Description;
 
-    public string CategoryID;
-    public DateTime DateTime;
+    public int CategoryID;
+    public DateTime UTCDateTime;
+
+    public SpendingItem() { }
+
+    public SpendingItem(ExpenseDTO data)
+    {
+        Id = data.Id;
+        SpendAmount = data.Value;
+        Description = data.Description;
+        CategoryID = data.categoryId;
+        UTCDateTime = data.Date;
+    }
 }

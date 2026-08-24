@@ -6,19 +6,25 @@ using UnityEngine;
 [Serializable]
 public class SpendCategory
 {
-    public string CategoryName;
-    public string CategoryID = Guid.NewGuid().ToString();
+    public string Name;
+    public int Id = -1;
 
     
     public SpendCategory()
     {
-        CategoryID = Guid.NewGuid().ToString();
-        CategoryName = "NO NAME";
+        Id = -1;
+        Name = "NO NAME";
+    }
+
+    public SpendCategory(CategoryDTO categoryData)
+    {
+        Id = categoryData.Id;
+        Name = categoryData.Name;
     }
 
     public SpendCategory(SpendCategory copyFrom)
     {
-        CategoryID = copyFrom.CategoryID; 
-        CategoryName = copyFrom.CategoryName;
+        Id = copyFrom.Id; 
+        Name = copyFrom.Name;
     }
 }

@@ -25,39 +25,13 @@ public class SpendCategoryLibrary : ScriptableObject
 
 	public List<SpendCategory> Categories;
 
-
-	public bool AssignNewIDToCat;
-	public int catToAssignNewId;
-
-	void OnValidate()
-	{
-		if (!AssignNewIDToCat) return;
-
-		AssignNewIDToCat = false;
-		if (catToAssignNewId < 0)
-		{
-			for (int i = 0; i < Categories.Count; i++)
-			{
-				var curr = Categories[i];
-				curr.CategoryID = Guid.NewGuid().ToString();
-			}
-			catToAssignNewId = -1;
-			return;
-		}
-
-		var cat = Categories[catToAssignNewId];
-		cat.CategoryID = Guid.NewGuid().ToString();
-		catToAssignNewId = -1;
-	}
-
-
 	public SpendCategory GetCategoryByName(string name)
     {
-        return Categories.Find(cat => cat.CategoryName == name);
+        return Categories.Find(cat => cat.Name == name);
 	}
 
-	public SpendCategory GetCategoryByID(string id)
+	public SpendCategory GetCategoryByID(int id)
 	{
-		return Categories.Find(cat => cat.CategoryID == id);
+		return Categories.Find(cat => cat.Id == id);
 	}
 }

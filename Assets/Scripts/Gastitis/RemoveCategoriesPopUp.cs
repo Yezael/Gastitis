@@ -28,7 +28,7 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 
 	public void OnWantsToRemoveCategory(CategoryItemUI toRemove)
 	{
-		var idx = CategoryLibrary.Categories.FindIndex(x => x.CategoryID == toRemove.Data.CategoryID);
+		var idx = CategoryLibrary.Categories.FindIndex(x => x.Id == toRemove.Data.Id);
 		CategoryLibrary.Categories.RemoveAt(idx);
 		CategoryItems.Remove(toRemove);
 		GameObject.Destroy(toRemove.gameObject);

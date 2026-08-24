@@ -58,7 +58,7 @@ public class NewSpendItemPopUp : MonoBehaviour
         AmountDisplayer.gameObject.SetActive(true);
 
         // Extract digits only
-        float number = ToPlainNumber(value);
+        decimal number = ToPlainNumber(value);
 
         if (number == -1)
         {
@@ -66,14 +66,14 @@ public class NewSpendItemPopUp : MonoBehaviour
             return;
         }
 
-        string formatted = ToFormattedNumber((float)number);
+        string formatted = ToFormattedNumber(number);
         AmountInput.text = formatted;
 
         StartEdittingAmountBtn.gameObject.SetActive(true);
         AmountDisplayer.text = formatted;
     }
 
-    public static float ToPlainNumber(string text)
+    public static decimal ToPlainNumber(string text)
     {
         string digitsOnly = Regex.Replace(text, @"[^\d]", "");
         if (!decimal.TryParse(digitsOnly, out decimal number)) return 0;
@@ -83,10 +83,10 @@ public class NewSpendItemPopUp : MonoBehaviour
             return -1;
         }
 
-        return (float) number;
+        return number;
     }
 
-    public static string ToFormattedNumber(float number)
+    public static string ToFormattedNumber(decimal number)
     {
         return number.ToString("#,0", CultureInfo.InvariantCulture) + "$";
     }
@@ -105,7 +105,7 @@ public class NewSpendItemPopUp : MonoBehaviour
         List<TMP_Dropdown.OptionData> options = new List<TMP_Dropdown.OptionData>();
         for (int i = 0; i < CategoryLibrary.Categories.Count; i++)
         {
-            options.Add(new TMP_Dropdown.OptionData(CategoryLibrary.Categories[i].CategoryName));
+            options.Add(new TMP_Dropdown.OptionData(CategoryLibrary.Categories[i].Name));
         }
         CategorySelector.AddOptions(options);
 
@@ -127,7 +127,7 @@ public class NewSpendItemPopUp : MonoBehaviour
             int selectedIdx = 0;
             for (int i = 0; i < CategoryLibrary.Categories.Count; i++)
             {
-                if (CategoryLibrary.Categories[i].CategoryID == existing.CategoryID)
+                if (CategoryLibrary.Categories[i].Id == existing.CategoryID)
                 {
                     selectedIdx = i;
                     break;
@@ -158,10 +158,10 @@ public class NewSpendItemPopUp : MonoBehaviour
             var newSpending = new SpendingItem()
             {
                 Description = DescriptionInput.text,
-                SpendAmount = float.Parse(newValue.ToString()),
-                CategoryID = categoryPicked.CategoryID,
-                DateTime = existing == null ? System.DateTime.Now : existing.DateTime,
-                DataVersion = SpendingItem.LatestDataVersion
+                SpendAmount = newValue,
+                CategoryID = categoryPicked.Id,
+                UTCDateTime = existing == null ? System.DateTime.UtcNow : existing.UTCDateTime,
+                Id = existing == null ? -1 : existing.Id
             };
             result.IsCancelled = false;
             result.NewSpending = newSpending;
