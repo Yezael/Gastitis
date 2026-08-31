@@ -19,10 +19,11 @@ public class SpendsManager : MonoBehaviour
 
     public SpendingRepository SpendingItems = new SpendingRepository();
 
-    public int currMonthShowing = 0;
-    public int currCategoryIDSelected = -1;
+    public int _currMonthShowing = 1;
+    public int _currCategoryIDSelected = -1;
+    public string _currSearchedWord = null;
+    private int _lastFetchedExpensesFrame = -1;
 
-    bool _isQuitting = false;
 
     private IExportService _exportService;
 
@@ -50,12 +51,13 @@ public class SpendsManager : MonoBehaviour
     public async void Initialize()
     {
         _dateTimeProvider = new SystemDateTimeProvider();
+        _currMonthShowing = _dateTimeProvider.NowUTC.Month;
 
         var customCategories = await FetchCategoriesFromAPI();
         InitializeCategories(customCategories);
 
-        var dataFromCloud = await FetchExpensesFromAPI();
-        InitializeSpendingItems(dataFromCloud);
+        SpendingItems = new SpendingRepository();
+        await FetchMonthSpendingsIfNeeded();
 
         UIManager.Initialize();
 
@@ -63,14 +65,13 @@ public class SpendsManager : MonoBehaviour
         ChangeCurrentMonthData(_dateTimeProvider.Now.Month);
     }
 
-    void InitializeSpendingItems(PagedResponseDTO<ExpenseDTO> initialData)
+    public async Task FetchMonthSpendingsIfNeeded()
     {
-        SpendingItems = new SpendingRepository();
-        for (int i = 0; i < initialData.Items.Count; i++)
-        {
-            var newItem = new SpendingItem(initialData.Items[i]);
-            SpendingItems.Add(newItem, _dateTimeProvider.NowUTC.Month);
-        }
+        if (_lastFetchedExpensesFrame == Time.frameCount) return;
+        _lastFetchedExpensesFrame = Time.frameCount;
+
+        var monthItems = await FetchExpensesFromAPI();
+        SpendingItems.AddOrModify(monthItems.Items, _currMonthShowing);
     }
 
     void InitializeCategories(List<CategoryDTO> initialData)
@@ -92,7 +93,7 @@ public class SpendsManager : MonoBehaviour
 
     public void ChangeCurrentMonthDataWithoutNotify(int newMonth)
     {
-        currMonthShowing = newMonth;
+        _currMonthShowing = newMonth;
     }
 
     public async Task<SpendingItem> AddSpendingItem(SpendingItem item)
@@ -108,9 +109,27 @@ public class SpendsManager : MonoBehaviour
 
         var newItem = new SpendingItem(result);
 
-        SpendingItems.Add(newItem, currMonthShowing);
+        SpendingItems.AddOrModify(newItem, _currMonthShowing);
         OnDirty?.Invoke();
         return newItem;
+    }
+
+    public async Task<decimal> GetTotalAmount()
+    {
+        var filter = new ExpenseFilterDTO()
+        {
+            CategoryID = _currCategoryIDSelected != -1? _currCategoryIDSelected : null,
+            Month = _currMonthShowing,
+            Year = _dateTimeProvider.NowUTC.Year,
+        };
+        var summary = await APIManager.GetExpensesSummaryAsync(filter);
+        if(summary == null)
+        {
+            Debug.LogWarning("Failed to retrieve summary from API");
+            return -1;
+        }
+
+        return summary.TotalAmount;
     }
 
     public async Task<SpendCategory> AddCategory(string newName)
@@ -140,7 +159,7 @@ public class SpendsManager : MonoBehaviour
             Debug.LogError("Error while deleting spending Item with id: " + item.Id);
         }
 
-        var removedFromLocal = SpendingItems.Remove(item, currMonthShowing);
+        var removedFromLocal = SpendingItems.Remove(item, _currMonthShowing);
         if (!removedFromLocal)
         {
             Debug.LogWarning("No items found for the month of the item to remove");
@@ -163,75 +182,10 @@ public class SpendsManager : MonoBehaviour
 
         var newItem = new SpendingItem(postResult);
         SpendingItems.RemoveById(item.Id, item.UTCDateTime.Month);
-        SpendingItems.Add(newItem, item.UTCDateTime.Month);
+        SpendingItems.AddOrModify(newItem, item.UTCDateTime.Month);
 
         OnDirty?.Invoke();
         return newItem;
-    }
-
-    public decimal GetTotalSpending(int month, int categoryID)
-    {
-        return SpendingItems.GetTotal(month, categoryID);
-    }
-
-    public void SaveData()
-    {
-        var dataToSerialize = new SerializableData(SpendingItems.All);
-        var json = JsonConvert.SerializeObject(dataToSerialize);
-        PlayerPrefs.SetString("DATA", json);
-
-        var categoriesJson = JsonConvert.SerializeObject(CategoryLibrary.Categories);
-        PlayerPrefs.SetString("CATEGORIESDATAS", categoriesJson);
-
-        PlayerPrefs.Save();
-    }
-
-    public Dictionary<int, List<SpendingItem>> GetDataFromLocalDisk()
-    {
-        var stringData = PlayerPrefs.GetString("DATA");
-        if (string.IsNullOrEmpty(stringData))
-        {
-            return new Dictionary<int, List<SpendingItem>>();
-        }
-
-        var data = JsonConvert.DeserializeObject<SerializableData>(stringData);
-        return data.SpendingItems;
-    }
-
-    public List<SpendCategory> GetCategoriesDatasFromLocalDisk()
-    {
-        var stringData = PlayerPrefs.GetString("CATEGORIESDATAS");
-        if (string.IsNullOrEmpty(stringData))
-        {
-            return null;
-        }
-
-        var data = JsonConvert.DeserializeObject<List<SpendCategory>>(stringData);
-        return data;
-    }
-
-    void OnApplicationPause(bool pause)
-    {
-        if (pause && !_isQuitting)
-        {
-            SaveData();
-        }
-    }
-
-    void OnApplicationFocus(bool focus)
-    {
-#if !UNITY_EDITOR
-        if (!focus && !_isQuitting)
-        {
-            SaveData();
-        }
-#endif
-    }
-
-    void OnApplicationQuit()
-    {
-        _isQuitting = true;
-        SaveData();
     }
 
     public void ExportCurrentMonthSpendings(int month, string monthName)
@@ -244,14 +198,7 @@ public class SpendsManager : MonoBehaviour
         _exportService.Export(monthData, monthName);
     }
 
-    #region Networking
-    [ContextMenu("Send test expense to API")]
-    public async void SendTestExpenseToAPI()
-    {
-        await APIManager.CreateTestExpenseAsync();
-    }
-
-    [ContextMenu("Fetch expenses from API")]
+    #region API calls
     public async Task<PagedResponseDTO<ExpenseDTO>> FetchExpensesFromAPI()
     {
         var localTime = _dateTimeProvider.Now;
@@ -259,51 +206,24 @@ public class SpendsManager : MonoBehaviour
 
         var filter = new ExpenseFilterDTO()
         {
-            Month = utcTime.Month,
+            Month = _currMonthShowing,
             Year = utcTime.Year,
-            CategoryID = currCategoryIDSelected != -1? currCategoryIDSelected : null
+            CategoryID = _currCategoryIDSelected != -1? _currCategoryIDSelected : null,
+            Keyword = _currSearchedWord,
         };
 
         return await APIManager.GetExpensesAsync(filter);
     }
 
-    [ContextMenu("Fetch expenses from API filter category 1")]
-    public async void FetchExpensesFromAPIFilterCategory1()
-    {
-        await APIManager.GetExpensesAsync(new ExpenseFilterDTO() { CategoryID = 1});
-    }
-
-    [ContextMenu("Fetch expenses from API filter category 2")]
-    public async void FetchExpensesFromAPIFilterCategory2()
-    {
-        await APIManager.GetExpensesAsync(new ExpenseFilterDTO() { CategoryID = 2});
-    }
-
-    [ContextMenu("Fetch expenses from API with sorting value")]
-    public async void FetchExpensesFromAPIWithSortingValue()
-    {
-        await APIManager.GetExpensesAsync(sortingRequest: new ExpenseSortingDTO() {
-            SortDirection = SortDirection.Asc,
-            SortBy = SortBy.Value
-        });
-    }
-
-    [ContextMenu("Send test Category to API")]
-    public async void SendTestCategoryToAPI()
-    {
-        await APIManager.CreateTestCategoryAsync();
-    }
-
-    [ContextMenu("Fetch Categories from API")]
     public async Task<List<CategoryDTO>> FetchCategoriesFromAPI()
     {
         return await APIManager.GetCategoriesAsync();
     }
 
-    [ContextMenu("Get general Summary from API")]
-    public async void GetGeneralSumaryFromAPI()
+    [ContextMenu("Get category Summary from API")]
+    public async void GetCategorySummary()
     {
-        await APIManager.GetExpensesSummaryAsync();
+        await APIManager.GetCategorySummaryAsync();
     }
 
     #endregion

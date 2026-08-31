@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -28,7 +29,9 @@ public class UIManager : MonoBehaviour
 
     public List<SpendItemUI> spendItemUIs = new List<SpendItemUI>();
 
-    private string _currSearchFilter = string.Empty;
+    private string _currSearchFilter => _spendsManager._currSearchedWord;
+
+    private IEnumerator _currRefreshItemsRoutine = null;
 
     public void Initialize()
     {
@@ -208,11 +211,11 @@ public class UIManager : MonoBehaviour
         newCategory--;
         if (newCategory < 0)
         {
-            _spendsManager.currCategoryIDSelected = -1;
+            _spendsManager._currCategoryIDSelected = -1;
         }
         else
         {
-            _spendsManager.currCategoryIDSelected = CategoryLibrary.Categories[newCategory].Id;
+            _spendsManager._currCategoryIDSelected = CategoryLibrary.Categories[newCategory].Id;
         }
 
         RefreshUIBaseOnCurrentData();
@@ -220,19 +223,38 @@ public class UIManager : MonoBehaviour
 
     void OnSearchInputChanged(string newValue)
     {
-        _currSearchFilter = (newValue ?? string.Empty).Trim();
-        RefreshVisibleElements();
-        RefreshTotalSpendings();
+        var searchQuery = newValue;
+        if (searchQuery == string.Empty)
+        {
+            searchQuery = null;
+        }
+        else
+        {
+            searchQuery = searchQuery.Trim();
+        }
+        _spendsManager._currSearchedWord = searchQuery;
+        RefreshUIBaseOnCurrentData();
     }
 
     void RefreshUIBaseOnCurrentData()
     {
         RefreshTotalSpendings();
-        RefreshVisibleElements();
-        MonthSelectorDropdown.SetValueWithoutNotify(_spendsManager.currMonthShowing - 1);
+        StartRefreshingvisibleItems();
+        MonthSelectorDropdown.SetValueWithoutNotify(_spendsManager._currMonthShowing - 1);
     }
 
-    void RefreshVisibleElements()
+    void StartRefreshingvisibleItems()
+    {
+        if(_currRefreshItemsRoutine != null)
+        {
+            StopCoroutine(_currRefreshItemsRoutine);
+        }
+
+        _currRefreshItemsRoutine = RefreshVisibleElements();
+        StartCoroutine(_currRefreshItemsRoutine);
+    }
+
+    IEnumerator RefreshVisibleElements()
     {
         for (int i = 0; i < spendItemUIs.Count; i++)
         {
@@ -241,15 +263,19 @@ public class UIManager : MonoBehaviour
 
         spendItemUIs.Clear();
 
-        var newData = _spendsManager.SpendingItems.GetByMonth(_spendsManager.currMonthShowing);
-        if (newData == null) return;
+        var refreshMonthDataTask = _spendsManager.FetchMonthSpendingsIfNeeded();
+
+        while (!refreshMonthDataTask.IsCompleted) yield return null;
+
+        var newData = _spendsManager.SpendingItems.GetByMonth(_spendsManager._currMonthShowing);
+        if (newData == null) yield break;
 
         for (int i = 0; i < newData.Count; i++)
         {
             var item = newData[i];
 
             // Category filter
-            if (_spendsManager.currCategoryIDSelected != -1 && item.CategoryID != _spendsManager.currCategoryIDSelected)
+            if (_spendsManager._currCategoryIDSelected != -1 && item.CategoryID != _spendsManager._currCategoryIDSelected)
             {
                 continue;
             }
@@ -307,30 +333,16 @@ public class UIManager : MonoBehaviour
         StartCoroutine(EditSpendingFlow(itemUI));
     }
 
-    void RefreshTotalSpendings()
+    async void RefreshTotalSpendings()
     {
-        decimal total = 0;
-        var monthData = _spendsManager.SpendingItems.GetByMonth(_spendsManager.currMonthShowing);
+        TotalSpendText.text = "...";
 
-        for (int i = 0; i < monthData.Count; i++)
+        var total = await _spendsManager.GetTotalAmount();
+
+        if(total == -1)
         {
-            var item = monthData[i];
-
-            // Apply category filter
-            if (_spendsManager.currCategoryIDSelected != -1
-                && item.CategoryID != _spendsManager.currCategoryIDSelected) continue;
-
-            // Apply search filter
-            if (!string.IsNullOrEmpty(_currSearchFilter))
-            {
-                var desc = item.Description ?? string.Empty;
-                if (desc.IndexOf(_currSearchFilter, StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
-            }
-
-            total += item.SpendAmount;
+            TotalSpendText.text = "Undefined";
+            return;
         }
 
         TotalSpendText.text = NewSpendItemPopUp.ToFormattedNumber(total);
@@ -338,8 +350,8 @@ public class UIManager : MonoBehaviour
 
     void OnExportClicked()
     {
-        var monthName = MonthSelectorDropdown.options[_spendsManager.currMonthShowing - 1].text;
-        _spendsManager.ExportCurrentMonthSpendings(_spendsManager.currMonthShowing, monthName);
+        var monthName = MonthSelectorDropdown.options[_spendsManager._currMonthShowing - 1].text;
+        _spendsManager.ExportCurrentMonthSpendings(_spendsManager._currMonthShowing, monthName);
     }
 
     void OnSpendsManagerDirty()

@@ -35,7 +35,7 @@ public class Test_ChangeCurrentMonth
 
 		_spendManagerInstance.ChangeCurrentMonthData(2);
 
-		Assert.AreEqual(2, _spendManagerInstance.currMonthShowing);
+		Assert.AreEqual(2, _spendManagerInstance._currMonthShowing);
 
 		GameObject.DestroyImmediate(_spendManagerInstance.gameObject);
 	}

@@ -18,14 +18,78 @@ public class SpendingRepository
         All = initial;
     }
 
-    public void Add(SpendingItem item, int month)
+    public void AddOrModify(SpendingItem item, int month)
     {
         if (!All.ContainsKey(month))
         {
             All.Add(month, new List<SpendingItem>());
         }
 
-        All[month].Add(item);
+        InternalAddOrModifyExpense(All[month], item);
+    }
+
+    public void AddOrModify(ExpenseDTO item, int month)
+    {
+        if (!All.ContainsKey(month))
+        {
+            All.Add(month, new List<SpendingItem>());
+        }
+
+        InternalAddOrModifyExpense(All[month], item);
+    }
+
+    public void AddOrModify(List<ExpenseDTO> cloudItems, int month)
+    {
+        if (!All.ContainsKey(month))
+        {
+            All.Add(month, new List<SpendingItem>());
+        }
+
+        var monthData = All[month];
+
+        InternalAddOrModifyExpense(monthData, cloudItems);
+    }
+
+    void InternalAddOrModifyExpense(List<SpendingItem> monthData, ExpenseDTO data)
+    {
+        var foundPrevious = monthData.Find(x => x.Id == data.Id);
+        if (foundPrevious != null)
+        {
+            foundPrevious.CopyFrom(data);
+            return;
+        }
+
+        var newItem = new SpendingItem(data);
+        monthData.Add(newItem);
+    }
+
+    void InternalAddOrModifyExpense(List<SpendingItem> monthData, SpendingItem data)
+    {
+        var foundPrevious = monthData.Find(x => x.Id == data.Id);
+        if (foundPrevious != null)
+        {
+            foundPrevious.CopyFrom(data);
+            return;
+        }
+
+        var newItem = new SpendingItem(data);
+        monthData.Add(newItem);
+    }
+
+    void InternalAddOrModifyExpense(List<SpendingItem> monthData, List<ExpenseDTO> cloudItems)
+    {
+        for (int i = 0; i < cloudItems.Count; i++)
+        {
+            var foundPrevious = monthData.Find(x => x.Id == cloudItems[i].Id);
+            if (foundPrevious != null)
+            {
+                foundPrevious.CopyFrom(cloudItems[i]);
+                continue;
+            }
+
+            var newItem = new SpendingItem(cloudItems[i]);
+            monthData.Add(newItem);
+        }
     }
 
     public bool Remove(SpendingItem item, int month)

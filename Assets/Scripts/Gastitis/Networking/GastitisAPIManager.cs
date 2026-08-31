@@ -231,6 +231,30 @@ public class GastitisAPIManager
         }
     }
 
+    public async Task<PagedResponseDTO<ExpensesCategorySummaryResponseDTO>> GetCategorySummaryAsync(
+        ExpenseFilterDTO filterRequest = null)
+    {
+        var endPoint = ExpensesEndPoint;
+        endPoint += "/CategorySummary";
+        endPoint = AddFilterOptions(endPoint, filterRequest);
+
+        using (var www = UnityWebRequest.Get(endPoint))
+        {
+            await SendRequestAsync(www);
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"Error fetching expenses: {www.error}");
+                return null;
+            }
+
+            var expensesPagedResponse = 
+                JsonConvert.DeserializeObject<PagedResponseDTO<ExpensesCategorySummaryResponseDTO>>(www.downloadHandler.text);
+            Debug.Log($"Base result from API: " + expensesPagedResponse);
+            return expensesPagedResponse;
+        }
+    }
+
     private string AddFilterOptions(string endPoint, ExpenseFilterDTO filter)
     {
         var baseEndpoint = endPoint;
@@ -244,6 +268,7 @@ public class GastitisAPIManager
         if (filter.Year.HasValue) baseEndpoint += $"&year={filter.Year}";
         if (filter.Month.HasValue) baseEndpoint += $"&month={filter.Month}";
         if (filter.CategoryID.HasValue) baseEndpoint += $"&categoryID={filter.CategoryID}";
+        if (!string.IsNullOrEmpty(filter.Keyword)) baseEndpoint += $"&Keyword={filter.Keyword}";
 
         return baseEndpoint;
     }

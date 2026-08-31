@@ -76,6 +76,25 @@ public class ExpensesSummaryDTO
 }
 
 [Serializable]
+public class ExpensesCategorySummaryResponseDTO
+{
+    public int CategoryId;
+    public string CategoryName;
+    public decimal TotalAmount;
+    public int ExpenseCount;
+
+    public override string ToString()
+    {
+        var str = string.Empty;
+        str += "CategoryId: " + CategoryId + "\n";
+        str += "CategoryName: " + CategoryName + "\n";
+        str += "TotalAmount: " + TotalAmount + "\n";
+        str += "ExpenseCount: " + ExpenseCount + "\n";
+        return str;
+    }
+}
+
+[Serializable]
 public class PagedResponseDTO<T>
 {
     public List<T> Items;
@@ -110,6 +129,7 @@ public class ExpenseFilterDTO
     public int? Year;
     public int? Month;
     public int? CategoryID;
+    public string Keyword;
 
     public int Page = 1;
     public int PageSize = 20;
