@@ -1,3 +1,0 @@
-#!/bin/sh
-cmd //c "RunTests 2.bat"
-
