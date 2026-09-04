@@ -143,7 +143,7 @@ public class SpendsManager : MonoBehaviour
             Debug.LogError("Error while creating category with name: " + newName);
         }
 
-        var newLocalCat = new SpendCategory(newCatDTO);
+        var newLocalCat = new SpendCategory(result);
 
         CategoryLibrary.Categories.Add(newLocalCat);
         OnDirty?.Invoke();
