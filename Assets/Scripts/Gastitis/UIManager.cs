@@ -12,6 +12,7 @@ public class UIManager : MonoBehaviour
     private SpendsManager _spendsManager;
 
 
+    public AuthenticationUIManager AuthenticationManagerUI;
     public NewSpendItemPopUp NewSpendItemPopUp;
     public NewCategoryBtnPopUp newCategoryPopUp;
     public RemoveCategoriesPopUp RemoveCategoriesPopUp;
@@ -35,6 +36,7 @@ public class UIManager : MonoBehaviour
 
     public void Initialize()
     {
+        AuthenticationManagerUI.Init();
         BuildCategoryDropdownOptions();
         SetupUiListeners();
 
@@ -97,6 +99,12 @@ public class UIManager : MonoBehaviour
     void OnRemoveCategoriesClicked()
     {
         StartCoroutine(OpenCategoriesRemoval());
+    }
+
+    IEnumerator StartLogInSequece()
+    {
+        LogInTryResult result = new LogInTryResult();
+        yield return AuthenticationManagerUI.OpenLogInFlow(result);
     }
 
     IEnumerator GetNewSpending()
@@ -238,6 +246,12 @@ public class UIManager : MonoBehaviour
 
     void RefreshUIBaseOnCurrentData()
     {
+        if (!AuthenticationManager.IsAuthenticated)
+        {
+            StartCoroutine(StartLogInSequece());
+            return;
+		}
+
         RefreshTotalSpendings();
         StartRefreshingvisibleItems();
         MonthSelectorDropdown.SetValueWithoutNotify(_spendsManager._currMonthShowing - 1);

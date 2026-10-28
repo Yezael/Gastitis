@@ -186,6 +186,12 @@ public class NewSpendingResult
     public SpendingItem NewSpending;
 }
 
+public class LogInTryResult
+{
+    public bool IsCancelled;
+    public bool Succeded;
+}
+
 public class NewCategoryResult
 {
     public bool IsCancelled;

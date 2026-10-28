@@ -1,11 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Newtonsoft.Json;
 using System.Threading.Tasks;
-using TMPro;
-using System.Runtime.CompilerServices;
-using GluonGui.Dialog;
 
 public class SpendsManager : MonoBehaviour
 {
