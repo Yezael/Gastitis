@@ -37,17 +37,17 @@ public class UIManager : MonoBehaviour
     public void Initialize()
     {
         AuthenticationManagerUI.Init();
-        BuildCategoryDropdownOptions();
         SetupUiListeners();
-
-        NewSpendItemPopUp.gameObject.SetActive(false);
-
-        _spendsManager.OnDirty += OnSpendsManagerDirty;
-
-        RefreshUIBaseOnCurrentData();
     }
 
-    private void OnDestroy()
+    public void OpenUi()
+    {
+		BuildCategoryDropdownOptions();
+		NewSpendItemPopUp.gameObject.SetActive(false);
+		RefreshUIBaseOnCurrentData();
+	}
+
+	private void OnDestroy()
     {
         if (_spendsManager != null)
         {
@@ -66,9 +66,10 @@ public class UIManager : MonoBehaviour
         ExportMonthSpendingsButton.onClick.AddListener(OnExportClicked);
 
         SearchInputField.onValueChanged.AddListener(OnSearchInputChanged);
-    }
+		_spendsManager.OnDirty += OnSpendsManagerDirty;
+	}
 
-    void BuildCategoryDropdownOptions()
+	void BuildCategoryDropdownOptions()
     {
         CategorySelectorDropdown.options.Clear();
 
@@ -101,9 +102,12 @@ public class UIManager : MonoBehaviour
         StartCoroutine(OpenCategoriesRemoval());
     }
 
-    IEnumerator StartLogInSequece()
+    public IEnumerator StartLogInSequece(LogInTryResult result = null)
     {
-        LogInTryResult result = new LogInTryResult();
+        if (result == null)
+        {
+            result = new LogInTryResult();
+        }
         yield return AuthenticationManagerUI.OpenLogInFlow(result);
     }
 
@@ -243,6 +247,7 @@ public class UIManager : MonoBehaviour
         _spendsManager._currSearchedWord = searchQuery;
         RefreshUIBaseOnCurrentData();
     }
+
 
     void RefreshUIBaseOnCurrentData()
     {

@@ -46,6 +46,17 @@ public class SpendsManager : MonoBehaviour
 
     public async void Initialize()
     {
+        UIManager.Initialize();
+        if (!AuthenticationManager.IsAuthenticated)
+        {
+            var result = new LogInTryResult();
+            StartCoroutine(UIManager.StartLogInSequece(result));
+            while(!result.IsCancelled && !result.Succeded)
+            {
+                await Task.Delay(10);
+            }
+        }
+
         _dateTimeProvider = new SystemDateTimeProvider();
         _currMonthShowing = _dateTimeProvider.NowUTC.Month;
 
