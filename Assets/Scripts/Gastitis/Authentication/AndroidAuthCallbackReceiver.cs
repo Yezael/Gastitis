@@ -5,6 +5,9 @@ using UnityEngine;
 
 public class AndroidAuthCallbackReceiver : MonoBehaviour
 {
+	[SerializeField]
+	private AuthenticationManager _authenticationManager;
+
 	private void Awake()
 	{
 		Application.deepLinkActivated += HandleDeeplink;
@@ -20,7 +23,7 @@ public class AndroidAuthCallbackReceiver : MonoBehaviour
 		Application.deepLinkActivated -= HandleDeeplink;
 	}
 
-	private void HandleDeeplink(string url)
+	private async void HandleDeeplink(string url)
 	{
 		Debug.Log("Entered Handle deep link method");
 		if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return;
@@ -29,8 +32,8 @@ public class AndroidAuthCallbackReceiver : MonoBehaviour
 		if (!string.Equals(uri.AbsolutePath,"/oauth2redirect", StringComparison.Ordinal)) return;
 		if (!string.IsNullOrEmpty(uri.Fragment)) return;
 
-		Debug.Log("Android authentication callback received");
-
+		Debug.Log("Android authentication callback received, about to call authenticator");
+		await _authenticationManager.HandleAuthorizationCallbackAsync(uri);
 	}
 
 }

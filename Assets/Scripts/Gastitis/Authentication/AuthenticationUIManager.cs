@@ -9,25 +9,32 @@ public class AuthenticationUIManager : MonoBehaviour
     [SerializeField] Button _logInBtn;
     [SerializeField] AuthenticationManager _authenticationManager;
 
-    public bool _WantsToLogIn = false;
+    public bool _wantsToLogIn = false;
 
     public void Init()
     {
-        _WantsToLogIn = false;
-        _logInBtn.onClick.AddListener(() => _WantsToLogIn = true);
+        _wantsToLogIn = false;
+        _logInBtn.onClick.AddListener(() => _wantsToLogIn = true);
     }
 
     public IEnumerator OpenLogInFlow(LogInTryResult results)
     {
+        results.Succeded = false;
+        _wantsToLogIn = false;
         _mainObj.SetActive(true);
-        while (!_WantsToLogIn)
+
+        while (!results.IsCancelled && !_authenticationManager.IsAuthenticated())
         {
+            if (_wantsToLogIn)
+            {
+                _wantsToLogIn = false;
+                _authenticationManager.BeginLogin();
+            }
             yield return null;
         }
 
-        _authenticationManager.BeginLogin();
+        results.Succeded = !results.IsCancelled && _authenticationManager.IsAuthenticated();
 
-        _WantsToLogIn = false;
         _mainObj.SetActive(false);
     }
 }

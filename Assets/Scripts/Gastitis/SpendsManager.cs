@@ -5,9 +5,14 @@ using System.Threading.Tasks;
 
 public class SpendsManager : MonoBehaviour
 {
+    [SerializeField]
+    private AuthenticationManager _authenticationManager;
+
+    public AuthenticationManager AuthenticationManager => _authenticationManager;
+
     public static SpendsManager Instance;
 
-    public GastitisAPIManager APIManager = new GastitisAPIManager();
+    public GastitisAPIManager APIManager { get; private set; }
     public SpendCategoryLibrary CategoryLibrary;
     public UIManager UIManager;
 
@@ -30,6 +35,7 @@ public class SpendsManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
+            APIManager = new GastitisAPIManager(_authenticationManager);
             return;
         }
 
@@ -47,7 +53,7 @@ public class SpendsManager : MonoBehaviour
     public async void Initialize()
     {
         UIManager.Initialize();
-        if (!AuthenticationManager.IsAuthenticated)
+        if (!AuthenticationManager.IsAuthenticated())
         {
             var result = new LogInTryResult();
             StartCoroutine(UIManager.StartLogInSequece(result));
@@ -55,6 +61,8 @@ public class SpendsManager : MonoBehaviour
             {
                 await Task.Delay(10);
             }
+
+            if (!result.Succeded) return;
         }
 
         _dateTimeProvider = new SystemDateTimeProvider();
@@ -66,7 +74,9 @@ public class SpendsManager : MonoBehaviour
         SpendingItems = new SpendingRepository();
         await FetchMonthSpendingsIfNeeded();
 
-        UIManager.Initialize();
+        Debug.Log("Correctly fetched spending items and categories");
+
+        UIManager.OpenUi();
 
         _exportService = new CsvExportService(CategoryLibrary);
         ChangeCurrentMonthData(_dateTimeProvider.Now.Month);

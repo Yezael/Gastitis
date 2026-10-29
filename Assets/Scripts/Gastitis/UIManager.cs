@@ -251,7 +251,7 @@ public class UIManager : MonoBehaviour
 
     void RefreshUIBaseOnCurrentData()
     {
-        if (!AuthenticationManager.IsAuthenticated)
+        if (!SpendsManager.Instance.AuthenticationManager.IsAuthenticated())
         {
             StartCoroutine(StartLogInSequece());
             return;

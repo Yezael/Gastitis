@@ -11,6 +11,16 @@ public class GastitisAPIManager
     private const string BaseUrl = "http://localhost:5036/api/";
     private const string ExpensesEndPoint = BaseUrl + "expenses";
     private const string CategoriesEndPoint = BaseUrl + "categories";
+    private readonly IAccessTokenProvider _tokenProvider;
+
+    public GastitisAPIManager(IAccessTokenProvider tokenProvider)
+    {
+        if(tokenProvider == null)
+        {
+			throw new ArgumentNullException(nameof(tokenProvider));
+		}
+        _tokenProvider = tokenProvider;
+    }
 
     public async Task CreateTestCategoryAsync()
     {
@@ -286,17 +296,29 @@ public class GastitisAPIManager
         return baseEndpoint;
     }
 
-    private static Task SendRequestAsync(UnityWebRequest request)
+    private Task SendRequestAsync(UnityWebRequest request)
     {
-        var tcs = new TaskCompletionSource<bool>();
 
-        var operation = request.SendWebRequest();
-        operation.completed += _ =>
+		if (!_tokenProvider.TryGetAccessToken(out var accessToken))
         {
-            // Complete the Task regardless of success/failure; caller will inspect request.result
-            tcs.TrySetResult(true);
-        };
+			throw new InvalidOperationException("A usable access token is required for this API request.");
+		}
 
-        return tcs.Task;
+        request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
+        request.redirectLimit = 0;
+        request.timeout = 30;
+
+		var tcs = new TaskCompletionSource<bool>();
+		var operation = request.SendWebRequest();
+
+		// Complete the Task regardless of success/failure; caller will inspect request.result
+		operation.completed += _ => tcs.TrySetResult(true);
+
+		if (operation.isDone)
+		{
+			tcs.TrySetResult(true);
+		}
+
+		return tcs.Task;
     }
 }
