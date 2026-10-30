@@ -9,8 +9,9 @@ public class SpendsManager : MonoBehaviour
     private AuthenticationManager _authenticationManager;
 
     public AuthenticationManager AuthenticationManager => _authenticationManager;
+	public long CurrSessionDataVersion => _currSessionDataVersion;
 
-    public static SpendsManager Instance;
+	public static SpendsManager Instance;
 
     public GastitisAPIManager APIManager { get; private set; }
     public SpendCategoryLibrary CategoryLibrary;
@@ -25,6 +26,7 @@ public class SpendsManager : MonoBehaviour
     public string _currSearchedWord = null;
     private int _lastFetchedExpensesFrame = -1;
 
+    private long _currSessionDataVersion;
 
     private IExportService _exportService;
 
@@ -45,14 +47,16 @@ public class SpendsManager : MonoBehaviour
         }
     }
 
-    private void Start()
+    private async void Start()
     {
-        Initialize();
+        await Initialize();
     }
 
-    public async void Initialize()
+    public async Task Initialize()
     {
-        UIManager.Initialize();
+        AuthenticationManager.OnSessionWasInvalidated += ClearSessionData;
+
+		UIManager.Initialize();
         if (!AuthenticationManager.IsAuthenticated())
         {
             var result = new LogInTryResult();
@@ -66,32 +70,65 @@ public class SpendsManager : MonoBehaviour
         }
 
         _dateTimeProvider = new SystemDateTimeProvider();
-        _currMonthShowing = _dateTimeProvider.NowUTC.Month;
-
-        var customCategories = await FetchCategoriesFromAPI();
-        InitializeCategories(customCategories);
-
-        SpendingItems = new SpendingRepository();
-        await FetchMonthSpendingsIfNeeded();
-
-        Debug.Log("Correctly fetched spending items and categories");
-
-        UIManager.OpenUi();
-
         _exportService = new CsvExportService(CategoryLibrary);
-        ChangeCurrentMonthData(_dateTimeProvider.Now.Month);
+        await LoadSessionDataAsync();
     }
 
-    public async Task FetchMonthSpendingsIfNeeded()
+	private void EnsureCurrentSessionData(long incommingVersion)
+	{
+		if (this == null || incommingVersion != _currSessionDataVersion)
+		{
+			throw new OperationCanceledException("The session data changed while the operation was running.");
+		}
+	}
+
+	private void ClearSessionData()
     {
-        if (_lastFetchedExpensesFrame == Time.frameCount) return;
-        _lastFetchedExpensesFrame = Time.frameCount;
+        _currSessionDataVersion++;
+		CategoryLibrary.Categories.Clear();
+		SpendingItems.Clear();
 
-        var monthItems = await FetchExpensesFromAPI();
-        SpendingItems.AddOrModify(monthItems.Items, _currMonthShowing);
-    }
+		_lastFetchedExpensesFrame = -1;
+		_currCategoryIDSelected = -1;
+		_currSearchedWord = null;
+        UIManager.ClearSessionUI();
+	}
 
-    void InitializeCategories(List<CategoryDTO> initialData)
+    public async Task LoadSessionDataAsync()
+    {
+		ClearSessionData();
+
+        var sessionversion = _currSessionDataVersion;
+
+		_currMonthShowing = _dateTimeProvider.NowUTC.Month;
+
+		var customCategories = await FetchCategoriesFromAPI();
+        EnsureCurrentSessionData(sessionversion);
+		InitializeCategories(customCategories);
+
+		await FetchMonthSpendingsIfNeeded();
+		EnsureCurrentSessionData(sessionversion);
+
+		Debug.Log("Correctly fetched spending items and categories");
+		UIManager.StartValidSessionUI();
+	}
+
+	public async Task FetchMonthSpendingsIfNeeded()
+	{
+		if (_lastFetchedExpensesFrame == Time.frameCount) return;
+
+		_lastFetchedExpensesFrame = Time.frameCount;
+
+		long sessionVersion = _currSessionDataVersion;
+		int requestedMonth = _currMonthShowing;
+
+		var monthItems = await FetchExpensesFromAPI();
+		EnsureCurrentSessionData(sessionVersion);
+
+		SpendingItems.AddOrModify(monthItems.Items, requestedMonth);
+	}
+
+	void InitializeCategories(List<CategoryDTO> initialData)
     {
         CategoryLibrary.Categories = new List<SpendCategory>();
         for (int i = 0; i < initialData.Count; i++)

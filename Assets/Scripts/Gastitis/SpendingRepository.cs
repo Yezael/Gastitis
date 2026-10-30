@@ -147,4 +147,9 @@ public class SpendingRepository
 
         return total;
     }
+
+    public void Clear()
+    {
+        All.Clear();
+    }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using UnityEngine;
 
@@ -16,6 +17,17 @@ public class AuthenticationManager : MonoBehaviour, IAccessTokenProvider
 	private TokenResponse _tokens;
 	private double _accessTokenUsableUntil;
 	private Task<string> _refreshTask;
+	public long SessionVersion { get; private set; }
+
+	public event Action OnSessionWasInvalidated;
+
+	private void InvalidateSession()
+	{
+		SessionVersion++;
+		_tokens = null;
+		_accessTokenUsableUntil = 0;
+		OnSessionWasInvalidated?.Invoke();
+	}
 
 
 	public void BeginLogin()
@@ -29,7 +41,10 @@ public class AuthenticationManager : MonoBehaviour, IAccessTokenProvider
 			return;
 		}
 
-		_pendingLogin = PendingLogin.Create(AuthorizationEndpoint, ClientId, AndroidRedirectUri);
+		var newLoginSession = PendingLogin.Create(AuthorizationEndpoint, ClientId, AndroidRedirectUri);
+
+		InvalidateSession();
+		_pendingLogin = newLoginSession;
 
 		Application.OpenURL(_pendingLogin.AuthorizationUrl);
 	}
@@ -149,6 +164,9 @@ public class AuthenticationManager : MonoBehaviour, IAccessTokenProvider
 		_accessTokenUsableUntil = requestStartedAt + tokens.ExpiresIn - safetyMarginSeconds;
 	}
 
+	/// <summary>
+	/// do we currently have a locally usable access token?
+	/// </summary>
 	public bool IsAuthenticated()
 	{
 		if (_tokens == null) return false;
@@ -156,6 +174,19 @@ public class AuthenticationManager : MonoBehaviour, IAccessTokenProvider
 		if (Time.realtimeSinceStartupAsDouble >= _accessTokenUsableUntil) return false;
 
 		return true;
+	}
+
+	/// <summary>
+	/// do we have a usable access token or credentials with which to attempt refresh?
+	/// </summary>
+	public bool HasSession()
+	{
+		if (_tokens == null) return false;
+
+		if (IsAuthenticated()) return true;
+		if (!string.IsNullOrWhiteSpace(_tokens.RefreshToken)) return true;
+
+		return false;
 	}
 
 	public bool TryGetAccessToken(out string accessToken)
@@ -216,8 +247,7 @@ public class AuthenticationManager : MonoBehaviour, IAccessTokenProvider
 		{
 			if (this != null && ReferenceEquals(_tokens, previousTokens))
 			{
-				_tokens = null;
-				_accessTokenUsableUntil = 0;
+				InvalidateSession();
 			}
 			throw;
 		}

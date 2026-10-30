@@ -1,5 +1,8 @@
 
+using System.Threading.Tasks;
+
 public interface IAccessTokenProvider
 {
-	bool TryGetAccessToken(out string accessToken);
+	Task<string> GetAccessTokenAsync();
+	long SessionVersion { get; }
 }

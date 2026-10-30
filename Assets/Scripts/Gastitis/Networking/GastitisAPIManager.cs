@@ -63,13 +63,33 @@ public class GastitisAPIManager
             if (www.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError($"Error fetching categories: {www.error}");
-                return new List<CategoryDTO>();
+                throw new InvalidOperationException($"Get Categories failed with code: {www.responseCode}");
             }
-            var categories = JsonConvert.DeserializeObject<List<CategoryDTO>>(www.downloadHandler.text);
-            Debug.Log($"Fetched {categories.Count} categories from API.");
+
+			List<CategoryDTO> categories;
+			try
+			{
+				categories = JsonConvert.DeserializeObject<List<CategoryDTO>>(www.downloadHandler.text);
+			}
+			catch (JsonException)
+			{
+				throw new InvalidOperationException("Reading categories failed, content didn't come with the expected format");
+			}
+
+			if (categories == null)
+			{
+				throw new InvalidOperationException("Reading categories failed, data is null");
+			}
+
+			Debug.Log($"Fetched {categories.Count} categories from API.");
             foreach (var category in categories)
             {
-                Debug.Log($"Category ID: {category.Id} | Name: {category.Name}");
+                if(category == null)
+                {
+					throw new InvalidOperationException("Reading categories failed, found null category");
+				}
+
+				Debug.Log($"Category ID: {category.Id} | Name: {category.Name}");
             }
             return categories;
         }
@@ -201,15 +221,39 @@ public class GastitisAPIManager
             if (www.result != UnityWebRequest.Result.Success)
             {
                 Debug.LogError($"Error fetching expenses: {www.error}");
-                return null;
+                throw new InvalidOperationException($"Get Expenses failed with code: {www.responseCode}");
             }
 
-            var expensesPagedResponse = JsonConvert.DeserializeObject<PagedResponseDTO<ExpenseDTO>>(www.downloadHandler.text);
-            Debug.Log($"Base result from API: " + expensesPagedResponse);
-            Debug.Log($"Fetched {expensesPagedResponse.TotalCount} expenses from API.");
-            foreach (var expense in expensesPagedResponse.Items)
+            PagedResponseDTO<ExpenseDTO> expensesPagedResponse;
+			try
             {
-                Debug.Log($"Expense ID: {expense.Id} | Value: {expense.Value} | Description: {expense.Description}");
+				expensesPagedResponse = JsonConvert.DeserializeObject<PagedResponseDTO<ExpenseDTO>>(www.downloadHandler.text);
+			}
+            catch (JsonException)
+            {
+                throw new InvalidOperationException("Reading expenses failed, content didn't come with the expected format");
+            }
+
+			if (expensesPagedResponse == null)
+			{
+				throw new InvalidOperationException("Reading Expenses failed, data is null");
+			}
+
+			Debug.Log($"Base result from API: " + expensesPagedResponse);
+            Debug.Log($"Fetched {expensesPagedResponse.TotalCount} expenses from API.");
+
+			if (expensesPagedResponse.Items == null)
+			{
+				throw new InvalidOperationException("Reading Expenses failed, found null expenses items");
+			}
+			foreach (var expense in expensesPagedResponse.Items)
+			{
+				if (expense == null)
+				{
+					throw new InvalidOperationException("Reading Expenses failed, found null expense");
+				}
+
+				Debug.Log($"Expense ID: {expense.Id} | Value: {expense.Value} | Description: {expense.Description}");
             }
 
             return expensesPagedResponse;
@@ -296,29 +340,44 @@ public class GastitisAPIManager
         return baseEndpoint;
     }
 
-    private Task SendRequestAsync(UnityWebRequest request)
+    private void ValidateCurrentSessionVersion(long originalSessionvVersion)
     {
-
-		if (!_tokenProvider.TryGetAccessToken(out var accessToken))
+        if(_tokenProvider.SessionVersion != originalSessionvVersion)
         {
-			throw new InvalidOperationException("A usable access token is required for this API request.");
-		}
+            throw new OperationCanceledException("The authentication session changed during the request");
+        }
+    }
 
-        request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
-        request.redirectLimit = 0;
-        request.timeout = 30;
+    private async Task SendRequestAsync(UnityWebRequest request)
+    {
+        var originalSessionVersion = _tokenProvider.SessionVersion;
 
-		var tcs = new TaskCompletionSource<bool>();
-		var operation = request.SendWebRequest();
+        try
+        {
+            string accessToken = await _tokenProvider.GetAccessTokenAsync();
+            ValidateCurrentSessionVersion(originalSessionVersion);
 
-		// Complete the Task regardless of success/failure; caller will inspect request.result
-		operation.completed += _ => tcs.TrySetResult(true);
+            request.SetRequestHeader("Authorization", $"Bearer {accessToken}");
+            request.redirectLimit = 0;
+            request.timeout = 30;
 
-		if (operation.isDone)
-		{
-			tcs.TrySetResult(true);
-		}
+            var completion = new TaskCompletionSource<bool>();
+            var operation = request.SendWebRequest();
 
-		return tcs.Task;
+            operation.completed += _ => completion.TrySetResult(true);
+
+            if (operation.isDone)
+            {
+                completion.TrySetResult(true);
+            }
+            await completion.Task;
+
+        }
+        catch (Exception) when (originalSessionVersion != _tokenProvider.SessionVersion)
+        {
+            throw new OperationCanceledException("The authentication session changed during the request");
+        }
+
+        ValidateCurrentSessionVersion(originalSessionVersion);
     }
 }

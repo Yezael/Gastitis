@@ -8,23 +8,26 @@ using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
-    [SerializeField]
-    private SpendsManager _spendsManager;
+	[SerializeField] private SpendsManager _spendsManager;
+	[SerializeField] private Transform _spendPoolParent;
 
-
-    public AuthenticationUIManager AuthenticationManagerUI;
+	public AuthenticationUIManager AuthenticationManagerUI;
     public NewSpendItemPopUp NewSpendItemPopUp;
     public NewCategoryBtnPopUp newCategoryPopUp;
     public RemoveCategoriesPopUp RemoveCategoriesPopUp;
     public SpendCategoryLibrary CategoryLibrary;
+
     public Button AddSpendingButton;
     public Button AddCategoryButton;
     public Button RemoveCategoriesButton;
     public Button ExportMonthSpendingsButton;
+
     public SpendItemUI SpendingButtonUIProtitype;
     public Transform SpendingsListContentParent;
+
     public TMP_Dropdown MonthSelectorDropdown;
     public TMP_Dropdown CategorySelectorDropdown;
+
     public TMP_Text TotalSpendText;
     public TMP_InputField SearchInputField;
 
@@ -33,18 +36,24 @@ public class UIManager : MonoBehaviour
     private string _currSearchFilter => _spendsManager._currSearchedWord;
 
     private IEnumerator _currRefreshItemsRoutine = null;
+    private LogInTryResult _currLoginTry;
+    private long _currSummaryRequestVersion;
+    private Pool<SpendItemUI> _spendItemsPool;
 
     public void Initialize()
     {
         AuthenticationManagerUI.Init();
         SetupUiListeners();
-    }
+		_spendItemsPool = new Pool<SpendItemUI>(SpendingButtonUIProtitype, _spendPoolParent, 3);
+        ClearSessionUI();
+	}
 
-    public void OpenUi()
+    public void StartValidSessionUI()
     {
 		BuildCategoryDropdownOptions();
 		NewSpendItemPopUp.gameObject.SetActive(false);
 		RefreshUIBaseOnCurrentData();
+        SetSessionControlsInteractable(true);
 	}
 
 	private void OnDestroy()
@@ -68,6 +77,7 @@ public class UIManager : MonoBehaviour
         SearchInputField.onValueChanged.AddListener(OnSearchInputChanged);
 		_spendsManager.OnDirty += OnSpendsManagerDirty;
 	}
+
 
 	void BuildCategoryDropdownOptions()
     {
@@ -104,11 +114,32 @@ public class UIManager : MonoBehaviour
 
     public IEnumerator StartLogInSequece(LogInTryResult result = null)
     {
-        if (result == null)
+		if (result == null)
+		{
+			result = new LogInTryResult();
+		}
+
+		if (_currLoginTry != null)
         {
-            result = new LogInTryResult();
+            var currTry = _currLoginTry;
+            while (currTry == _currLoginTry) yield return null;
+
+			
+			result.Succeded = currTry.Succeded;
+            result.IsCancelled = currTry.IsCancelled;
+            yield break;
+		}
+
+        _currLoginTry = result;
+
+        try
+        {
+            yield return AuthenticationManagerUI.OpenLogInFlow(result);
         }
-        yield return AuthenticationManagerUI.OpenLogInFlow(result);
+        finally
+        {
+            _currLoginTry = null;
+        }
     }
 
     IEnumerator GetNewSpending()
@@ -124,12 +155,12 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    IEnumerator EditSpendingFlow(SpendItemUI itemUI)
+    IEnumerator EditSpendingFlow(SpendingItem spendData)
     {
-        var previousValue = itemUI.SpendingItemData.SpendAmount;
+        var previousValue = spendData.SpendAmount;
 
         NewSpendingResult result = new NewSpendingResult();
-        yield return NewSpendItemPopUp.ModifyOrCreateSpending(itemUI.SpendingItemData, result);
+        yield return NewSpendItemPopUp.ModifyOrCreateSpending(spendData, result);
         if (result.IsCancelled)
         {
             yield break;
@@ -147,15 +178,27 @@ public class UIManager : MonoBehaviour
             yield break;
         }
 
-        // Update UI item to reflect new data
-        itemUI.SetData(task.Result);
+        var itemUi = GetSpendingByDataId(task.Result.Id);
+		// Update UI item to reflect new data
+		itemUi.SetData(task.Result);
 
-        var newValue = itemUI.SpendingItemData.SpendAmount;
+        var newValue = itemUi.SpendingItemData.SpendAmount;
 
         if(newValue != previousValue)
         {
             RefreshTotalSpendings();
         }
+    }
+
+    SpendItemUI GetSpendingByDataId(int dataId)
+    {
+        for (int i = 0; i < spendItemUIs.Count; i++)
+        {
+            if (spendItemUIs[i].SpendingItemData.Id != dataId) continue;
+            return spendItemUIs[i];
+        }
+
+        return null;
     }
 
     IEnumerator OpenCategoriesRemoval()
@@ -251,7 +294,7 @@ public class UIManager : MonoBehaviour
 
     void RefreshUIBaseOnCurrentData()
     {
-        if (!SpendsManager.Instance.AuthenticationManager.IsAuthenticated())
+        if (!SpendsManager.Instance.AuthenticationManager.HasSession())
         {
             StartCoroutine(StartLogInSequece());
             return;
@@ -260,6 +303,10 @@ public class UIManager : MonoBehaviour
         RefreshTotalSpendings();
         StartRefreshingvisibleItems();
         MonthSelectorDropdown.SetValueWithoutNotify(_spendsManager._currMonthShowing - 1);
+        if(_currSearchFilter != SearchInputField.text)
+        {
+            SearchInputField.SetTextWithoutNotify(_currSearchFilter);
+        }
     }
 
     void StartRefreshingvisibleItems()
@@ -275,21 +322,39 @@ public class UIManager : MonoBehaviour
 
     IEnumerator RefreshVisibleElements()
     {
-        for (int i = 0; i < spendItemUIs.Count; i++)
-        {
-            Destroy(spendItemUIs[i].gameObject);
-        }
-
-        spendItemUIs.Clear();
-
         var refreshMonthDataTask = _spendsManager.FetchMonthSpendingsIfNeeded();
 
         while (!refreshMonthDataTask.IsCompleted) yield return null;
 
-        var newData = _spendsManager.SpendingItems.GetByMonth(_spendsManager._currMonthShowing);
-        if (newData == null) yield break;
+        if (refreshMonthDataTask.IsCanceled) yield break;
 
-        for (int i = 0; i < newData.Count; i++)
+		if (refreshMonthDataTask.IsFaulted)
+		{
+			var exception = refreshMonthDataTask.Exception.GetBaseException();
+
+			if (exception is TokenRequestException tokenException
+				&& tokenException.IsInvalidGrant)
+			{
+				Debug.LogWarning("Session expired. Sign in again.");
+			}
+			else
+			{
+				Debug.LogWarning("Could not load expenses. Try again.");
+			}
+
+			yield break;
+		}
+
+		var newData = _spendsManager.SpendingItems.GetByMonth(_spendsManager._currMonthShowing);
+        if (newData == null)
+        {
+			Debug.LogWarning($"Null data from month {_spendsManager._currMonthShowing}");
+			yield break;
+        }
+
+        ClearAllSpendingUis();
+
+		for (int i = 0; i < newData.Count; i++)
         {
             var item = newData[i];
 
@@ -315,7 +380,8 @@ public class UIManager : MonoBehaviour
 
     void AddSpendingItemUI(SpendingItem item)
     {
-        var newUI = Instantiate(SpendingButtonUIProtitype, SpendingsListContentParent);
+        var newUI = _spendItemsPool.Get();
+        newUI.transform.SetParent(SpendingsListContentParent);
         newUI.SetData(item);
         newUI.gameObject.SetActive(true);
         newUI.OnWantsToRemoveSpending += OnSpendingUIRequestsRemove;
@@ -337,28 +403,48 @@ public class UIManager : MonoBehaviour
             yield return null;
         }
 
-        if (!task.Result == false) yield break;
+        if (task.Result == false) yield break;
 
         spendItemUIs.Remove(itemUI);
-        itemUI.OnWantsToRemoveSpending -= OnSpendingUIRequestsRemove;
-        itemUI.OnWantsToEditSpending -= OnSpendingUIRequestsEdit;
-        Destroy(itemUI.gameObject);
+        ReleaseItemUI(itemUI);
 
         RefreshTotalSpendings();
     }
 
     void OnSpendingUIRequestsEdit(SpendItemUI itemUI)
     {
-        StartCoroutine(EditSpendingFlow(itemUI));
+        StartCoroutine(EditSpendingFlow(itemUI.SpendingItemData));
     }
 
     async void RefreshTotalSpendings()
     {
+        _currSummaryRequestVersion++;
+
         TotalSpendText.text = "...";
+        var expenseSessionVersion = _spendsManager.CurrSessionDataVersion;
+        var summarySessionVersion = _currSummaryRequestVersion;
 
-        var total = await _spendsManager.GetTotalAmount();
+        decimal total = -1;
+        try
+        {
+            total = await _spendsManager.GetTotalAmount();
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (InvalidOperationException exception)
+        {
+            if (!SummaryRetrievalIsValid(expenseSessionVersion, summarySessionVersion)) return;
+            bool requiresLogin = exception is TokenRequestException tokenException && tokenException.IsInvalidGrant;
 
-        if(total == -1)
+            TotalSpendText.text = requiresLogin ? "Sign in required" : "Unavailable";
+            return;
+        }
+
+		if (!SummaryRetrievalIsValid(expenseSessionVersion, summarySessionVersion)) return;
+
+		if (total == -1)
         {
             TotalSpendText.text = "Undefined";
             return;
@@ -367,7 +453,62 @@ public class UIManager : MonoBehaviour
         TotalSpendText.text = NewSpendItemPopUp.ToFormattedNumber(total);
     }
 
-    void OnExportClicked()
+    bool SummaryRetrievalIsValid(long expenseSessionVersion, long summarySessionVersion)
+    {
+		if (this == null) return false;
+		if (_spendsManager == null) return false;
+		if (expenseSessionVersion != _spendsManager.CurrSessionDataVersion) return false;
+		if (summarySessionVersion != _currSummaryRequestVersion) return false;
+
+        return true;
+	}
+
+    public void ClearSessionUI()
+    {
+        _currSummaryRequestVersion++;
+		if (_currRefreshItemsRoutine != null)
+		{
+			StopCoroutine(_currRefreshItemsRoutine);
+			_currRefreshItemsRoutine = null;
+		}
+		ClearAllSpendingUis();
+
+		CategorySelectorDropdown.ClearOptions();
+        SearchInputField.SetTextWithoutNotify(string.Empty);
+        TotalSpendText.SetText("Sign in required");
+
+        SetSessionControlsInteractable(false);
+    }
+
+	private void SetSessionControlsInteractable(bool interactable)
+    {
+		AddCategoryButton.interactable = interactable;
+		AddSpendingButton.interactable = interactable;
+		RemoveCategoriesButton.interactable = interactable;
+		ExportMonthSpendingsButton.interactable = interactable;
+
+		MonthSelectorDropdown.interactable = interactable;
+		CategorySelectorDropdown.interactable = interactable;
+		SearchInputField.interactable = interactable;
+	}
+
+	void ClearAllSpendingUis()
+    {
+		for (int i = 0; i < spendItemUIs.Count; i++)
+		{
+            ReleaseItemUI(spendItemUIs[i]);
+		}
+		spendItemUIs.Clear();
+	}
+
+    void ReleaseItemUI(SpendItemUI item)
+    {
+		item.OnWantsToRemoveSpending -= OnSpendingUIRequestsRemove;
+		item.OnWantsToEditSpending -= OnSpendingUIRequestsEdit;
+        _spendItemsPool.Release(item);
+	}
+
+	void OnExportClicked()
     {
         var monthName = MonthSelectorDropdown.options[_spendsManager._currMonthShowing - 1].text;
         _spendsManager.ExportCurrentMonthSpendings(_spendsManager._currMonthShowing, monthName);
