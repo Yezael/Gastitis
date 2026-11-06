@@ -96,11 +96,20 @@ public class NewSpendItemPopUp : MonoBehaviour
         yield return ModifyOrCreateSpending(null, result);
     }
 
+    public void ClosePopUpInmediately()
+    {
+        cancelled = true;
+        confirmed = false;
+        gameObject.SetActive(false);
+    }
+
     public IEnumerator ModifyOrCreateSpending(SpendingItem existing, NewSpendingResult result)
     {
         gameObject.SetActive(true);
+		cancelled = false;
+		confirmed = false;
 
-        CategorySelector.ClearOptions();
+		CategorySelector.ClearOptions();
 
         List<TMP_Dropdown.OptionData> options = new List<TMP_Dropdown.OptionData>();
         for (int i = 0; i < CategoryLibrary.Categories.Count; i++)

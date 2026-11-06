@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,25 +15,28 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 	public CategoryItemUI CategoryItemPrototype;
 	public Transform CategoriesContentParent;
 
+	public bool IsOpen => gameObject.activeSelf;
+
+
 
 	private void Awake()
 	{
-		ClosePopUpBtn.onClick.AddListener(() =>
-		{
-			wantsToExitPopUp = true;
-		});
+		ClosePopUpBtn.onClick.AddListener(() => wantsToExitPopUp = true);
 
 		CategoryItems = new List<CategoryItemUI>();
 		CategoryItemPrototype.gameObject.SetActive(false);
 	}
 
-	public void OnWantsToRemoveCategory(CategoryItemUI toRemove)
+	public async Task OnWantsToRemoveCategory(CategoryItemUI toRemove)
 	{
-		var idx = CategoryLibrary.Categories.FindIndex(x => x.Id == toRemove.Data.Id);
-		CategoryLibrary.Categories.RemoveAt(idx);
-		CategoryItems.Remove(toRemove);
-		GameObject.Destroy(toRemove.gameObject);
-		RefreshCategoryItems();
+		toRemove.DisableDeleteBtn();
+		await SpendsManager.Instance.RemoveCategoryItemAsync(toRemove.Data);
+	}
+
+	public void ForcePopUpExit()
+	{
+		wantsToExitPopUp = true;
+		gameObject.SetActive(false);
 	}
 
 	public IEnumerator Execute(SpendCategoryLibrary library)
@@ -50,10 +54,11 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 		gameObject.SetActive(false);
 	}
 
-	void RefreshCategoryItems()
+	public void RefreshCategoryItems()
 	{
 		for (int i = 0; i < CategoryItems.Count; i++)
 		{
+			CategoryItems[i].OnWantsToRemoveCategory -= OnWantsToRemoveCategory;
 			Destroy(CategoryItems[i].gameObject);
 		}
 

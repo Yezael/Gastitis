@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Collections;
 
 public class SpendsManager : MonoBehaviour
 {
@@ -25,8 +27,10 @@ public class SpendsManager : MonoBehaviour
     public int _currCategoryIDSelected = -1;
     public string _currSearchedWord = null;
     private int _lastFetchedExpensesFrame = -1;
+	private bool _initializationComplete;
+	private Coroutine _sessionRecoveryRoutine;
 
-    private long _currSessionDataVersion;
+	private long _currSessionDataVersion;
 
     private IExportService _exportService;
 
@@ -54,7 +58,8 @@ public class SpendsManager : MonoBehaviour
 
     public async Task Initialize()
     {
-        AuthenticationManager.OnSessionWasInvalidated += ClearSessionData;
+		_initializationComplete = false;
+		AuthenticationManager.OnSessionWasInvalidated += HandleSessionInvalidated;
 
 		UIManager.Initialize();
         if (!AuthenticationManager.IsAuthenticated())
@@ -72,14 +77,64 @@ public class SpendsManager : MonoBehaviour
         _dateTimeProvider = new SystemDateTimeProvider();
         _exportService = new CsvExportService(CategoryLibrary);
         await LoadSessionDataAsync();
+        _initializationComplete = true;
     }
 
-	private void EnsureCurrentSessionData(long incommingVersion)
+
+    void HandleSessionInvalidated()
+    {
+        ClearSessionData();
+
+        if (!_initializationComplete) return;
+        if (_sessionRecoveryRoutine != null) return;
+
+        _sessionRecoveryRoutine = StartCoroutine(RecoverSessionAsync());
+
+	}
+
+    IEnumerator RecoverSessionAsync()
+    {
+        try
+        {
+			var result = new LogInTryResult();
+			yield return UIManager.StartLogInSequece(result);
+			if (result.IsCancelled || !result.Succeded)
+			{
+				Debug.LogWarning("User cancelled login or failed to log in");
+				yield break;
+			}
+
+			var loadTask = LoadSessionDataAsync();
+			while (!loadTask.IsCompleted)
+			{
+				yield return null;
+			}
+			if (loadTask.IsFaulted || loadTask.IsCanceled)
+			{
+				Debug.LogError("Failed to load session data after login");
+				yield break;
+			}
+		}
+		finally
+		{
+			_sessionRecoveryRoutine = null;
+		}
+	}
+
+
+	private void ThrowOnSessionMissmatch(long incommingVersion)
 	{
-		if (this == null || incommingVersion != _currSessionDataVersion)
+		if (!IsSameSession(incommingVersion))
 		{
 			throw new OperationCanceledException("The session data changed while the operation was running.");
 		}
+	}
+
+	public bool IsSameSession(long incommingVersion)
+	{
+        if (this == null) return false;
+        if(incommingVersion != _currSessionDataVersion) return false;
+        return true;
 	}
 
 	private void ClearSessionData()
@@ -103,11 +158,11 @@ public class SpendsManager : MonoBehaviour
 		_currMonthShowing = _dateTimeProvider.NowUTC.Month;
 
 		var customCategories = await FetchCategoriesFromAPI();
-        EnsureCurrentSessionData(sessionversion);
+        ThrowOnSessionMissmatch(sessionversion);
 		InitializeCategories(customCategories);
 
 		await FetchMonthSpendingsIfNeeded();
-		EnsureCurrentSessionData(sessionversion);
+		ThrowOnSessionMissmatch(sessionversion);
 
 		Debug.Log("Correctly fetched spending items and categories");
 		UIManager.StartValidSessionUI();
@@ -123,7 +178,7 @@ public class SpendsManager : MonoBehaviour
 		int requestedMonth = _currMonthShowing;
 
 		var monthItems = await FetchExpensesFromAPI();
-		EnsureCurrentSessionData(sessionVersion);
+		ThrowOnSessionMissmatch(sessionVersion);
 
 		SpendingItems.AddOrModify(monthItems.Items, requestedMonth);
 	}
@@ -154,7 +209,9 @@ public class SpendsManager : MonoBehaviour
     {
         var dto = new ExpenseDTO(item);
 
-        var result = await APIManager.PostExpenseAsync(dto);
+        var currentSessionVersion = _currSessionDataVersion;
+		var result = await APIManager.PostExpenseAsync(dto);
+        ThrowOnSessionMissmatch(currentSessionVersion);
         if(result == null)
         {
             Debug.LogError("Error while creating item");
@@ -163,7 +220,7 @@ public class SpendsManager : MonoBehaviour
 
         var newItem = new SpendingItem(result);
 
-        SpendingItems.AddOrModify(newItem, _currMonthShowing);
+        SpendingItems.AddOrModify(newItem, newItem.UTCDateTime.Month);
         OnDirty?.Invoke();
         return newItem;
     }
@@ -188,14 +245,17 @@ public class SpendsManager : MonoBehaviour
 
     public async Task<SpendCategory> AddCategory(string newName)
     {
-        var newCatDTO = new CategoryDTO();
-        newCatDTO.Name = newName;
+        var newCatDTO = new CategoryDTO() { Name = newName };
 
-        var result = await APIManager.PostCategoryAsync(newCatDTO);
-        if(result == null)
+        var currentSessionVersion = _currSessionDataVersion;
+		var result = await APIManager.PostCategoryAsync(newCatDTO);
+		ThrowOnSessionMissmatch(currentSessionVersion);
+
+		if (result == null)
         {
             Debug.LogError("Error while creating category with name: " + newName);
-        }
+            return null;
+		}
 
         var newLocalCat = new SpendCategory(result);
 
@@ -207,13 +267,19 @@ public class SpendsManager : MonoBehaviour
 
     public async Task<bool> RemoveSpendingItem(SpendingItem item)
     {
-        var result = await APIManager.DeleteExpenseAsync(item.Id);
-        if(result == false)
+        var currentSessionVersion = _currSessionDataVersion;
+        var originalMonth = item.UTCDateTime.Month;
+
+		var result = await APIManager.DeleteExpenseAsync(item.Id);
+		ThrowOnSessionMissmatch(currentSessionVersion);
+
+		if (result == false)
         {
             Debug.LogError("Error while deleting spending Item with id: " + item.Id);
+            return false;
         }
 
-        var removedFromLocal = SpendingItems.Remove(item, _currMonthShowing);
+        var removedFromLocal = SpendingItems.Remove(item, originalMonth);
         if (!removedFromLocal)
         {
             Debug.LogWarning("No items found for the month of the item to remove");
@@ -223,20 +289,47 @@ public class SpendsManager : MonoBehaviour
         return true;
     }
 
+    public async Task<bool> RemoveCategoryItemAsync(SpendCategory category)
+    {
+        var currentSessionVersion = _currSessionDataVersion;
+
+		var result = await APIManager.DeleteCategoryAsync(category.Id);
+		ThrowOnSessionMissmatch(currentSessionVersion);
+
+		if (result == false)
+        {
+            Debug.LogError("Error while deleting category with id: " + category.Id);
+            return false;
+        }
+
+        var removedFromLocal = CategoryLibrary.Categories.Remove(category);
+        if (!removedFromLocal)
+        {
+            Debug.LogWarning("Category deleted from Database but not found in local library");
+        }
+
+        OnDirty?.Invoke();
+        return true;
+    }
+
     public async Task<SpendingItem> ModifyExistentSpendingItem(SpendingItem item)
     {
         var updateRequest = new UpdateExpenseDTO(item);
-        var postResult = await APIManager.PutExpenseAsync(item.Id, updateRequest);
+        var currentSessionVersion = _currSessionDataVersion;
+        var originalMonth = item.UTCDateTime.Month;
 
-        if(postResult == null)
+		var postResult = await APIManager.PutExpenseAsync(item.Id, updateRequest);
+		ThrowOnSessionMissmatch(currentSessionVersion);
+
+		if (postResult == null)
         {
             Debug.LogError("Failed to post item with id: " + item.Id);
             return null;
         }
 
         var newItem = new SpendingItem(postResult);
-        SpendingItems.RemoveById(item.Id, item.UTCDateTime.Month);
-        SpendingItems.AddOrModify(newItem, item.UTCDateTime.Month);
+        SpendingItems.RemoveById(item.Id, originalMonth);
+        SpendingItems.AddOrModify(newItem, newItem.UTCDateTime.Month);
 
         OnDirty?.Invoke();
         return newItem;

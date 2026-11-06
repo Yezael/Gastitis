@@ -182,6 +182,25 @@ public class GastitisAPIManager
         }
     }
 
+    public async Task<bool> DeleteCategoryAsync(int id)
+    {
+        var endPoint = CategoriesEndPoint;
+        endPoint += $"/{id}";
+
+        using (var www = UnityWebRequest.Delete(endPoint))
+        {
+            await SendRequestAsync(www);
+
+            if (www.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"Error DELETING category: {www.error} | Response: {www.downloadHandler?.text}");
+                return false;
+            }
+
+            return true;
+        }
+    }
+
 
 
     public async Task<ExpenseDTO> GetExpenseByID(int id)

@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,7 +10,7 @@ public class CategoryItemUI : MonoBehaviour
     public TMP_Text CategoryName;
     public Button RemoveSpendingBtn;
 
-    public Action<CategoryItemUI> OnWantsToRemoveCategory;
+    public Func<CategoryItemUI, Task> OnWantsToRemoveCategory;
 
     private void Awake()
     {
@@ -20,10 +21,16 @@ public class CategoryItemUI : MonoBehaviour
     {
         Data = item;
         CategoryName.text = item.Name;
-    }
+        RemoveSpendingBtn.interactable = true;
+	}
 
     private void WantsToRemoveCategory()
     {
         OnWantsToRemoveCategory?.Invoke(this);
 	}
+
+    public void DisableDeleteBtn()
+    {
+        RemoveSpendingBtn.interactable = false;
+    }
 }

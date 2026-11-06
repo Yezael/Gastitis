@@ -29,9 +29,19 @@ public class NewCategoryBtnPopUp : MonoBehaviour
 		});
 	}
 
+	public void ClosePopUpInmediately()
+	{
+		cancelled = true;
+		confirmed = false;
+		gameObject.SetActive(false);
+
+	}
+
 	public IEnumerator GetNewCategoryInfo(NewCategoryResult result)
 	{
 		gameObject.SetActive(true);
+		cancelled = false;
+		confirmed = false;
 
 		CategoryNameInput.text = "";
 

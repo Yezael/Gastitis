@@ -144,8 +144,11 @@ public class UIManager : MonoBehaviour
 
     IEnumerator GetNewSpending()
     {
+        var originalSession = _spendsManager.CurrSessionDataVersion;
         NewSpendingResult result = new NewSpendingResult();
         yield return NewSpendItemPopUp.GetNewSpending(result);
+        if (!_spendsManager.IsSameSession(originalSession)) yield break;
+
         if (result.IsCancelled) yield break;
 
         var task = _spendsManager.AddSpendingItem(result.NewSpending);
@@ -157,36 +160,18 @@ public class UIManager : MonoBehaviour
 
     IEnumerator EditSpendingFlow(SpendingItem spendData)
     {
-        var previousValue = spendData.SpendAmount;
+        var originalSession = _spendsManager.CurrSessionDataVersion;
 
-        NewSpendingResult result = new NewSpendingResult();
+		NewSpendingResult result = new NewSpendingResult();
         yield return NewSpendItemPopUp.ModifyOrCreateSpending(spendData, result);
-        if (result.IsCancelled)
-        {
-            yield break;
-        }
+        if (!_spendsManager.IsSameSession(originalSession)) yield break;
+        if (result.IsCancelled) yield break;
 
         var task = _spendsManager.ModifyExistentSpendingItem(result.NewSpending);
 
         while(!task.IsCompleted)
         {
             yield return null;
-        }
-
-        if(task.IsCanceled || task.IsFaulted)
-        {
-            yield break;
-        }
-
-        var itemUi = GetSpendingByDataId(task.Result.Id);
-		// Update UI item to reflect new data
-		itemUi.SetData(task.Result);
-
-        var newValue = itemUi.SpendingItemData.SpendAmount;
-
-        if(newValue != previousValue)
-        {
-            RefreshTotalSpendings();
         }
     }
 
@@ -203,7 +188,9 @@ public class UIManager : MonoBehaviour
 
     IEnumerator OpenCategoriesRemoval()
     {
-        yield return RemoveCategoriesPopUp.Execute(CategoryLibrary);
+        var session = _spendsManager.CurrSessionDataVersion;
+		yield return RemoveCategoriesPopUp.Execute(CategoryLibrary);
+        if (!_spendsManager.IsSameSession(session)) yield break;
         // After removal categories may have changed: rebuild dropdown and notify manager
         BuildCategoryDropdownOptions();
         HandleCategoryRemovalEffects();
@@ -211,8 +198,10 @@ public class UIManager : MonoBehaviour
 
     IEnumerator GetNewCategoryName()
     {
+        var originalSession = _spendsManager.CurrSessionDataVersion;
         NewCategoryResult result = new NewCategoryResult();
         yield return newCategoryPopUp.GetNewCategoryInfo(result);
+        if (!_spendsManager.IsSameSession(originalSession)) yield break;
         if (result.IsCancelled) yield break;
 
         var task = _spendsManager.AddCategory(result.NewCategoryName);
@@ -220,6 +209,10 @@ public class UIManager : MonoBehaviour
         {
             yield return null;
         }
+
+        if(task.IsCanceled || task.IsFaulted || task.Result == null) yield break;
+
+
         BuildCategoryDropdownOptions();
     }
 
@@ -294,11 +287,7 @@ public class UIManager : MonoBehaviour
 
     void RefreshUIBaseOnCurrentData()
     {
-        if (!SpendsManager.Instance.AuthenticationManager.HasSession())
-        {
-            StartCoroutine(StartLogInSequece());
-            return;
-		}
+        if (!SpendsManager.Instance.AuthenticationManager.HasSession()) return;
 
         RefreshTotalSpendings();
         StartRefreshingvisibleItems();
@@ -307,7 +296,11 @@ public class UIManager : MonoBehaviour
         {
             SearchInputField.SetTextWithoutNotify(_currSearchFilter);
         }
-    }
+        if(RemoveCategoriesPopUp.IsOpen)
+		{
+			RemoveCategoriesPopUp.RefreshCategoryItems();
+		}
+	}
 
     void StartRefreshingvisibleItems()
     {
@@ -403,7 +396,24 @@ public class UIManager : MonoBehaviour
             yield return null;
         }
 
-        if (task.Result == false) yield break;
+        if (task.IsCanceled) yield break;
+
+        if(task.IsFaulted)
+		{
+			var exception = task.Exception.GetBaseException();
+			if (exception is TokenRequestException tokenException
+				&& tokenException.IsInvalidGrant)
+			{
+				Debug.LogWarning("Session expired. Sign in again.");
+			}
+			else
+			{
+				Debug.LogWarning("Could not remove expense. Try again.");
+			}
+			yield break;
+		}
+
+		if (task.Result == false) yield break;
 
         spendItemUIs.Remove(itemUI);
         ReleaseItemUI(itemUI);
@@ -472,6 +482,9 @@ public class UIManager : MonoBehaviour
 			_currRefreshItemsRoutine = null;
 		}
 		ClearAllSpendingUis();
+        RemoveCategoriesPopUp.ForcePopUpExit();
+        NewSpendItemPopUp.ClosePopUpInmediately();
+        newCategoryPopUp.ClosePopUpInmediately();
 
 		CategorySelectorDropdown.ClearOptions();
         SearchInputField.SetTextWithoutNotify(string.Empty);
