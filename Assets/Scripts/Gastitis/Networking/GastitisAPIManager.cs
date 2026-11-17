@@ -8,7 +8,7 @@ using UnityEngine.Networking;
 
 public class GastitisAPIManager
 {
-    private const string BaseUrl = "http://localhost:5036/api/";
+    private const string BaseUrl = "https://gastitis-api.icyriver-8056fceb.brazilsouth.azurecontainerapps.io/api/";
     private const string ExpensesEndPoint = BaseUrl + "expenses";
     private const string CategoriesEndPoint = BaseUrl + "categories";
     private readonly IAccessTokenProvider _tokenProvider;
@@ -341,7 +341,7 @@ public class GastitisAPIManager
         if (filter.Year.HasValue) baseEndpoint += $"&year={filter.Year}";
         if (filter.Month.HasValue) baseEndpoint += $"&month={filter.Month}";
         if (filter.CategoryID.HasValue) baseEndpoint += $"&categoryID={filter.CategoryID}";
-        if (!string.IsNullOrEmpty(filter.Keyword)) baseEndpoint += $"&Keyword={filter.Keyword}";
+        if (!string.IsNullOrEmpty(filter.Keyword)) baseEndpoint += $"&Keyword={Uri.EscapeDataString(filter.Keyword)}";
 
         return baseEndpoint;
     }

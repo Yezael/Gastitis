@@ -43,7 +43,7 @@ public class Pool<T> where T : MonoBehaviour
 		if (item == null || !_pooledItems.Contains(item)) return;
 		if (!_checkedOutItems.Remove(item)) return;
 
-		item.transform.SetParent(_poolParent, false);
+		item.transform.SetParent(_poolParent, true);
 		item.gameObject.SetActive(false);
 		_availableItems.Push(item);
 	}

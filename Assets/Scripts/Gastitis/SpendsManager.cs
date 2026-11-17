@@ -180,7 +180,7 @@ public class SpendsManager : MonoBehaviour
 		var monthItems = await FetchExpensesFromAPI();
 		ThrowOnSessionMissmatch(sessionVersion);
 
-		SpendingItems.AddOrModify(monthItems.Items, requestedMonth);
+		SpendingItems.SetMonthSpendings(monthItems.Items, requestedMonth);
 	}
 
 	void InitializeCategories(List<CategoryDTO> initialData)
@@ -205,7 +205,7 @@ public class SpendsManager : MonoBehaviour
         _currMonthShowing = newMonth;
     }
 
-    public async Task<SpendingItem> AddSpendingItem(SpendingItem item)
+    public async Task AddSpendingItem(SpendingItem item)
     {
         var dto = new ExpenseDTO(item);
 
@@ -215,14 +215,10 @@ public class SpendsManager : MonoBehaviour
         if(result == null)
         {
             Debug.LogError("Error while creating item");
-            return null;
+            return;
         }
 
-        var newItem = new SpendingItem(result);
-
-        SpendingItems.AddOrModify(newItem, newItem.UTCDateTime.Month);
         OnDirty?.Invoke();
-        return newItem;
     }
 
     public async Task<decimal> GetTotalAmount()
@@ -279,12 +275,6 @@ public class SpendsManager : MonoBehaviour
             return false;
         }
 
-        var removedFromLocal = SpendingItems.Remove(item, originalMonth);
-        if (!removedFromLocal)
-        {
-            Debug.LogWarning("No items found for the month of the item to remove");
-        }
-
         OnDirty?.Invoke();
         return true;
     }
@@ -312,7 +302,7 @@ public class SpendsManager : MonoBehaviour
         return true;
     }
 
-    public async Task<SpendingItem> ModifyExistentSpendingItem(SpendingItem item)
+    public async Task ModifyExistentSpendingItem(SpendingItem item)
     {
         var updateRequest = new UpdateExpenseDTO(item);
         var currentSessionVersion = _currSessionDataVersion;
@@ -324,15 +314,10 @@ public class SpendsManager : MonoBehaviour
 		if (postResult == null)
         {
             Debug.LogError("Failed to post item with id: " + item.Id);
-            return null;
+            return;
         }
 
-        var newItem = new SpendingItem(postResult);
-        SpendingItems.RemoveById(item.Id, originalMonth);
-        SpendingItems.AddOrModify(newItem, newItem.UTCDateTime.Month);
-
         OnDirty?.Invoke();
-        return newItem;
     }
 
     public void ExportCurrentMonthSpendings(int month, string monthName)

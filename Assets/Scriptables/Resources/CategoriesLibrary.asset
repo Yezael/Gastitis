@@ -12,20 +12,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 54a35594e4395364299dcd98bc1f0711, type: 3}
   m_Name: CategoriesLibrary
   m_EditorClassIdentifier: 
-  Categories:
-  - CategoryName: Otros
-    CategoryID: 7060ec1e-d89f-4dde-adde-1b0cfb576e7c
-  - CategoryName: Mercado
-    CategoryID: f38f6862-af40-41d4-824e-6d6ce1f47ddf
-  - CategoryName: Mascotas
-    CategoryID: 2398b5b3-7432-47f2-bc88-c0e73328867e
-  - CategoryName: Salidas pareja
-    CategoryID: 1964c07f-0f31-4bd5-9a54-42474045a905
-  - CategoryName: Salidas amigos
-    CategoryID: 496d4597-d0f4-4d8c-aca6-2b614d769e7a
-  - CategoryName: Servicios
-    CategoryID: 9ea8f878-7a4a-4e0f-9289-c6122a7d8f7e
-  - CategoryName: Arriendo
-    CategoryID: 5b0171d9-99ab-4485-b2c1-9b378aef8704
-  AssignNewIDToCat: 0
-  catToAssignNewId: -1
+  Categories: []

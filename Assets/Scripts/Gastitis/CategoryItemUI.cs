@@ -21,7 +21,7 @@ public class CategoryItemUI : MonoBehaviour
     {
         Data = item;
         CategoryName.text = item.Name;
-        RemoveSpendingBtn.interactable = true;
+        TrySetRemoveBtnState(!Data.IsSystemCategory);
 	}
 
     private void WantsToRemoveCategory()
@@ -29,8 +29,12 @@ public class CategoryItemUI : MonoBehaviour
         OnWantsToRemoveCategory?.Invoke(this);
 	}
 
-    public void DisableDeleteBtn()
+    public void TrySetRemoveBtnState(bool newState)
     {
-        RemoveSpendingBtn.interactable = false;
+        if(newState && Data.IsSystemCategory)
+        {
+            newState = false;
+        }
+        RemoveSpendingBtn.interactable = newState;
     }
 }

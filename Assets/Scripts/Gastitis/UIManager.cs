@@ -81,20 +81,37 @@ public class UIManager : MonoBehaviour
 
 	void BuildCategoryDropdownOptions()
     {
+        int selectedCategoryId = _spendsManager._currCategoryIDSelected;
+        int selectedOptionIndex = 0;
+        bool selectedCategoryStillExists = selectedCategoryId == -1;
+
         CategorySelectorDropdown.options.Clear();
 
-        List<TMP_Dropdown.OptionData> options = new List<TMP_Dropdown.OptionData>();
-        var defaultOpt = new TMP_Dropdown.OptionData("NONE");
-        options.Add(defaultOpt);
+        List<TMP_Dropdown.OptionData> options = new List<TMP_Dropdown.OptionData>
+        {
+            new TMP_Dropdown.OptionData("All")
+        };
 
         for (int i = 0; i < CategoryLibrary.Categories.Count; i++)
         {
-            var newOpt = new TMP_Dropdown.OptionData(CategoryLibrary.Categories[i].Name);
-            options.Add(newOpt);
+            var category = CategoryLibrary.Categories[i];
+            options.Add(new TMP_Dropdown.OptionData(category.Name));
+
+            if (category.Id == selectedCategoryId)
+            {
+                selectedOptionIndex = i + 1;
+                selectedCategoryStillExists = true;
+            }
+        }
+
+        if (!selectedCategoryStillExists)
+        {
+            _spendsManager._currCategoryIDSelected = -1;
+            selectedOptionIndex = 0;
         }
 
         CategorySelectorDropdown.AddOptions(options);
-        CategorySelectorDropdown.SetValueWithoutNotify(0);
+        CategorySelectorDropdown.SetValueWithoutNotify(selectedOptionIndex);
     }
 
     void OnAddSpendingClicked()
@@ -104,7 +121,7 @@ public class UIManager : MonoBehaviour
 
     void OnAddCategoryClicked()
     {
-        StartCoroutine(GetNewCategoryName());
+        StartCoroutine(GetNewCategory());
     }
 
     void OnRemoveCategoriesClicked()
@@ -196,7 +213,7 @@ public class UIManager : MonoBehaviour
         HandleCategoryRemovalEffects();
     }
 
-    IEnumerator GetNewCategoryName()
+    IEnumerator GetNewCategory()
     {
         var originalSession = _spendsManager.CurrSessionDataVersion;
         NewCategoryResult result = new NewCategoryResult();
@@ -289,6 +306,7 @@ public class UIManager : MonoBehaviour
     {
         if (!SpendsManager.Instance.AuthenticationManager.HasSession()) return;
 
+        BuildCategoryDropdownOptions();
         RefreshTotalSpendings();
         StartRefreshingvisibleItems();
         MonthSelectorDropdown.SetValueWithoutNotify(_spendsManager._currMonthShowing - 1);
@@ -350,23 +368,6 @@ public class UIManager : MonoBehaviour
 		for (int i = 0; i < newData.Count; i++)
         {
             var item = newData[i];
-
-            // Category filter
-            if (_spendsManager._currCategoryIDSelected != -1 && item.CategoryID != _spendsManager._currCategoryIDSelected)
-            {
-                continue;
-            }
-
-            // Search filter (partial, case-insensitive)
-            if (!string.IsNullOrEmpty(_currSearchFilter))
-            {
-                var desc = item.Description ?? string.Empty;
-                if (desc.IndexOf(_currSearchFilter, StringComparison.OrdinalIgnoreCase) < 0)
-                {
-                    continue;
-                }
-            }
-
             AddSpendingItemUI(item);
         }
     }

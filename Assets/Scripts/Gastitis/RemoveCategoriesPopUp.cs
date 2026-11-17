@@ -29,8 +29,12 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 
 	public async Task OnWantsToRemoveCategory(CategoryItemUI toRemove)
 	{
-		toRemove.DisableDeleteBtn();
-		await SpendsManager.Instance.RemoveCategoryItemAsync(toRemove.Data);
+		toRemove.TrySetRemoveBtnState(false);
+		var succed = await SpendsManager.Instance.RemoveCategoryItemAsync(toRemove.Data);
+		if(!succed)
+		{
+			toRemove.TrySetRemoveBtnState(true);
+		}
 	}
 
 	public void ForcePopUpExit()
@@ -70,9 +74,8 @@ public class RemoveCategoriesPopUp : MonoBehaviour
 		{
 			AddCategoryUI(datas[i]);
 			CategoryItems[i].gameObject.SetActive(true);
-			CategoryItems[i].RemoveSpendingBtn.gameObject.SetActive(i != 0);
+			CategoryItems[i].TrySetRemoveBtnState(true);
 		}
-
 	}
 
 	void AddCategoryUI(SpendCategory categoryData)

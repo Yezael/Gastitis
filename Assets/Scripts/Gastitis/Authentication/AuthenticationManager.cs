@@ -1,17 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using UnityEngine;
 
 public class AuthenticationManager : MonoBehaviour, IAccessTokenProvider
 {
-	private const string AuthorizationEndpoint = "http://localhost:8080/realms/gastitis/protocol/openid-connect/auth";
+	private const string AuthorizationEndpoint = "https://gastitis-keycloak.icyriver-8056fceb.brazilsouth.azurecontainerapps.io/realms/gastitis/protocol/openid-connect/auth";
 	private const string ClientId = "gastitis-unity";
 	private const string AndroidRedirectUri = "com.lasgemasdelgary.gastitis:/oauth2redirect";
 	private PendingLogin _pendingLogin;
-	private const string TokenEndpoint = "http://localhost:8080/realms/gastitis/protocol/openid-connect/token";
+	private const string TokenEndpoint = "https://gastitis-keycloak.icyriver-8056fceb.brazilsouth.azurecontainerapps.io/realms/gastitis/protocol/openid-connect/token";
 	private readonly KeycloakTokenClient _tokenClient = new KeycloakTokenClient(TokenEndpoint, ClientId);
 	private bool _isExchangingCode;
 	private TokenResponse _tokens;
@@ -79,7 +78,7 @@ public class AuthenticationManager : MonoBehaviour, IAccessTokenProvider
 			Debug.LogWarning("Callback rejected: No incomming issuer found.");
 			return;
 		}
-		if(!string.Equals(issuer,"http://localhost:8080/realms/gastitis",StringComparison.Ordinal))
+		if(!string.Equals(issuer,"https://gastitis-keycloak.icyriver-8056fceb.brazilsouth.azurecontainerapps.io/realms/gastitis",StringComparison.Ordinal))
 		{
 			Debug.LogWarning("Callback rejected: unexpected issuer.");
 			return;
