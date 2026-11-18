@@ -42,12 +42,14 @@ public class UpdateExpenseDTO
     public decimal Value;
     public string Description;
     public int CategoryId;
+    public DateTime Date;
 
     public UpdateExpenseDTO(SpendingItem item)
     {
         Value = item.SpendAmount;
         Description = item.Description;
         CategoryId = item.CategoryID;
+		Date = item.UTCDateTime;
     }
 
     public UpdateExpenseDTO(ExpenseDTO item)
@@ -55,6 +57,7 @@ public class UpdateExpenseDTO
         Value = item.Value;
         Description = item.Description;
         CategoryId = item.categoryId;
+        Date = item.Date;
     }
 }
 

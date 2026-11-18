@@ -306,7 +306,6 @@ public class SpendsManager : MonoBehaviour
     {
         var updateRequest = new UpdateExpenseDTO(item);
         var currentSessionVersion = _currSessionDataVersion;
-        var originalMonth = item.UTCDateTime.Month;
 
 		var postResult = await APIManager.PutExpenseAsync(item.Id, updateRequest);
 		ThrowOnSessionMissmatch(currentSessionVersion);
